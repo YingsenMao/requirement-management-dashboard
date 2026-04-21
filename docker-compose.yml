@@ -1,0 +1,65 @@
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: mgt_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-mgt_db}
+      MYSQL_USER: ${DB_USER:-rms_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-rms_password}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Django Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mgt_backend
+    restart: always
+    environment:
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-this-in-production}
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=${DB_NAME:-mgt_db}
+      - DB_USER=${DB_USER:-rms_user}
+      - DB_PASSWORD=${DB_PASSWORD:-rms_password}
+      - DB_HOST=db
+      - DB_PORT=3306
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    volumes:
+      - ./rms_project:/app
+      - static_volume:/app/staticfiles
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "python manage.py migrate && gunicorn rms_project.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+
+
+      # Vue.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mgt_frontend
+    restart: always
+    ports:
+      - "18080:80"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_BASE_URL=
+
+volumes:
+  mysql_data:
+  static_volume:
