@@ -1,11 +1,8 @@
-# Use Python 3.11 slim image
 FROM python:3.11-slim
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set work directory
 WORKDIR /app
 
 # 优化点1：替换为国内镜像源（解决超时问题）
@@ -24,20 +21,14 @@ RUN apt-get update && apt-get install -y \
 ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
 
-COPY requirements.txt /app/
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# ===== pip 安装优化（关键！！！）=====
-RUN pip install --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir --default-timeout=120 -r requirements.txt
+COPY . .
 
-# Copy project files
-COPY . /app/
-
-# Collect static files
 RUN python manage.py collectstatic --noinput || true
 
-# Expose port
 EXPOSE 8000
 
-# Run migrations and start server
-CMD ["sh", "-c", "python manage.py migrate && gunicorn rms_project.wsgi:application --bind 0.0.0.0:8000 --workers 3"]
+CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"]
