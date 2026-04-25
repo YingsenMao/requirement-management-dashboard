@@ -22,7 +22,7 @@
       </el-table-column>
       <el-table-column prop="priority_score" label="Priority Score" width="130">
         <template #default="scope">
-          {{ scope.row.priority_score !== null ? scope.row.priority_score : 'N/A' }}
+          {{ scope.row.priority_score !== null ? scope.row.priority_score : 'TBD' }}
         </template>
       </el-table-column>
       <el-table-column prop="submission_date" label="Submission Date" width="150">
@@ -32,7 +32,7 @@
       </el-table-column>
       <el-table-column label="Actions" width="120" fixed="right">
         <template #default="scope">
-          <el-button size="small" type="primary" plain @click="handleEdit(scope.row)" :disabled="scope.row.status !== 'pending_review'">Edit</el-button>
+          <el-button size="small" type="primary" plain @click="handleEdit(scope.row)">View</el-button>
         </template>
       </el-table-column>
     </el-table>
