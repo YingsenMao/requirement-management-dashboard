@@ -29,7 +29,7 @@
         </el-table-column>
         <el-table-column prop="priority_score" label="Priority Score" width="140" align="center">
           <template #default="scope">
-            <span class="priority-score">{{ scope.row.priority_score !== null ? scope.row.priority_score : 'N/A' }}</span>
+            <span class="priority-score">{{ scope.row.priority_score !== null ? scope.row.priority_score : 'TBD' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="submission_date" label="Submission Date" width="160">
