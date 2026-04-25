@@ -1,11 +1,10 @@
 <template>
   <div class="login-container">
     <el-card class="login-card">
-      <template #header>
-        <div class="card-header">
-          <h2>Login</h2>
-        </div>
-      </template>
+      <div class="logo-wrapper">
+        <!-- Use absolute path to reference the public directory -->
+        <img src="/Yuwell.jpg" alt="Yuwell Logo" class="login-logo" />
+      </div>
       <el-form @submit.prevent="handleLogin" :model="form" label-position="top">
         <el-form-item label="Username">
           <el-input v-model="form.username" placeholder="Enter username" />
@@ -76,8 +75,15 @@ const handleLogin = async () => {
 .login-card {
   width: 400px;
 }
-.card-header {
+.logo-wrapper {
   text-align: center;
+}
+.login-logo {
+  max-width: 180px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
 }
 </style>
 

@@ -326,7 +326,7 @@ onMounted(fetchRequests)
 .user-dashboard {
   padding: 24px;
   background-color: #f5f7fa;
-  min-height: 100vh;
+  min-height: 100%;
 }
 .header-actions {
   display: flex;
