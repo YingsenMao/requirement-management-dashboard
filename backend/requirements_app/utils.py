@@ -12,9 +12,9 @@ def calculate_priority_score(instance):
     type_scores = {
         'regulatory': 50,
         'security': 40,
-        'revenue': 30,
-        'cost': 20,
-        'bug': 10,
+        'bug': 30,
+        'revenue': 20,
+        'cost': 10,
         'optimization': 0,
     }
     score += type_scores.get(instance.requirement_type, 0)
@@ -30,7 +30,7 @@ def calculate_priority_score(instance):
 
     # Revenue Impact Weights
     revenue_scores = {
-        '>1M': 40,
+        '>1M': 50,
         '300k-1M': 30,
         '50k-300k': 20,
         '<50k': 10,
