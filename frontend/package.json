@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tokens:studio": "node scripts/generate-tokens-studio-json.mjs"
   },
   "dependencies": {
     "vue": "^3.4.0",

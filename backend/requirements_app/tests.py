@@ -118,20 +118,36 @@ def test_priority_score_large_workload():
     assert req.priority_score == 45
 
 @pytest.mark.django_db
-def test_user_isolation():
+def test_user_global_read_and_owner_write():
     user1 = User.objects.create_user(username='user1', password='pass')
     user2 = User.objects.create_user(username='user2', password='pass')
     
-    RequirementRequest.objects.create(name='Req1', summary='Sum1', region='china', requirement_type='bug', impacted_users='<100', submitter=user1)
-    RequirementRequest.objects.create(name='Req2', summary='Sum2', region='china', requirement_type='bug', impacted_users='<100', submitter=user2)
+    req1 = RequirementRequest.objects.create(name='Req1', summary='Sum1', region='china', requirement_type='bug', impacted_users='<100', submitter=user1)
+    req2 = RequirementRequest.objects.create(name='Req2', summary='Sum2', region='china', requirement_type='bug', impacted_users='<100', submitter=user2)
     
     client = APIClient()
     client.force_authenticate(user=user1)
     
+    # User1 can see all requests (Global Read)
     response = client.get('/api/requests/')
     assert response.status_code == 200
-    assert len(response.data) == 1
-    assert response.data[0]['name'] == 'Req1'
+    assert len(response.data) == 2
+    
+    # User1 can edit their own pending_review request
+    response = client.patch(f'/api/requests/{req1.id}/', {'name': 'UpdatedReq1'}, format='json')
+    assert response.status_code == 200
+    
+    # User1 cannot edit user2's request
+    response = client.patch(f'/api/requests/{req2.id}/', {'name': 'UpdatedReq2'}, format='json')
+    assert response.status_code == 403
+    
+    # User1 cannot delete user2's request
+    response = client.delete(f'/api/requests/{req2.id}/')
+    assert response.status_code == 403
+    
+    # User1 can delete their own request
+    response = client.delete(f'/api/requests/{req1.id}/')
+    assert response.status_code == 204
 
 @pytest.mark.django_db
 def test_user_locking_mechanism():
@@ -177,3 +193,25 @@ def test_admin_update_workload_and_status():
     assert response.data['workload'] == 'small'
     assert response.data['status'] == 'confirmed'
     assert response.data['priority_score'] is not None
+
+@pytest.mark.django_db
+def test_admin_field_level_restrictions():
+    admin = User.objects.create_user(username='admin_restrict', password='pass', role='admin')
+    user = User.objects.create_user(username='user_restrict', password='pass')
+    req = RequirementRequest.objects.create(
+        name='OriginalName', summary='Sum', region='china', 
+        requirement_type='bug', impacted_users='<100', submitter=user
+    )
+    
+    client = APIClient()
+    client.force_authenticate(user=admin)
+    
+    # Admin tries to update workload (Allowed)
+    response = client.patch(f'/api/admin/requests/{req.id}/', {'workload': 'small'}, format='json')
+    assert response.status_code == 200
+    assert response.data['workload'] == 'small'
+    
+    # Admin tries to update name (Should be ignored due to read_only)
+    response = client.patch(f'/api/admin/requests/{req.id}/', {'name': 'HackedName'}, format='json')
+    assert response.status_code == 200
+    assert response.data['name'] == 'OriginalName'

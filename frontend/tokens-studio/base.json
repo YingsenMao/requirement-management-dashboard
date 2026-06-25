@@ -1,0 +1,41 @@
+{
+  "base": {
+    "body": {
+      "background": {
+        "$type": "color",
+        "$value": "{color.surface.page}",
+        "$description": "Matches src/styles/base.css — body uses var(--color-surface-page)"
+      },
+      "overflow-x-hidden": {
+        "$type": "string",
+        "$value": "hidden",
+        "$description": "Matches base.css body { overflow-x: hidden } — not applied as a Figma variable; for documentation in Tokens Studio only"
+      }
+    },
+    "html": {
+      "margin": {
+        "$type": "dimension",
+        "$value": "0px"
+      },
+      "padding": {
+        "$type": "dimension",
+        "$value": "0px"
+      },
+      "width": {
+        "$type": "dimension",
+        "$value": "100%"
+      },
+      "min-height": {
+        "$type": "dimension",
+        "$value": "100%"
+      }
+    },
+    "app": {
+      "min-height": {
+        "$type": "dimension",
+        "$value": "100%",
+        "$description": "Matches #app in base.css"
+      }
+    }
+  }
+}

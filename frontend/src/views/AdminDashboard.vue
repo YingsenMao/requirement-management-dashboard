@@ -14,7 +14,7 @@
         </div>
       </template>
 
-      <el-table :data="requests" style="width: 100%" v-loading="loading" stripe border class="data-table">
+      <el-table :data="requests" v-loading="loading" stripe border class="data-table table-fill">
         <el-table-column prop="name" label="Name" min-width="160" show-overflow-tooltip />
         <el-table-column prop="submitter_username" label="Submitter" width="140" />
         <el-table-column prop="status" label="Status" width="150">
@@ -70,7 +70,7 @@
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="Workload">
-                <el-select v-model="assessForm.workload" placeholder="Select workload" style="width: 100%;">
+                <el-select v-model="assessForm.workload" placeholder="Select workload" class="field-block">
                   <el-option label="Pending" value="pending" />
                   <el-option label="Small" value="small" />
                   <el-option label="Medium" value="medium" />
@@ -80,7 +80,7 @@
             </el-col>
             <el-col :span="12">
               <el-form-item label="Status">
-                <el-select v-model="assessForm.status" placeholder="Select status" style="width: 100%;">
+                <el-select v-model="assessForm.status" placeholder="Select status" class="field-block">
                   <el-option label="Pending Review" value="pending_review" />
                   <el-option label="Under Review" value="under_review" />
                   <el-option label="Confirmed" value="confirmed" />
@@ -267,80 +267,88 @@ onMounted(fetchRequests)
 </script>
 
 <style scoped>
+.table-fill {
+  width: 100%;
+}
+
+.field-block {
+  width: 100%;
+}
+
 .admin-dashboard {
-  padding: 24px;
-  background-color: #f5f7fa;
+  padding: var(--space-5);
+  background-color: var(--color-surface-page);
   min-height: 100vh;
   box-sizing: border-box;
 }
 
 .dashboard-card {
-  border-radius: 12px;
-  border: 1px solid #e4e7ed;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-lg);
+  border: var(--border-width-card) solid var(--color-border-default);
+  box-shadow: var(--shadow-card);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: var(--space-1) 0;
 }
 
 .header-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-2);
 }
 
 .brand-icon {
-  font-size: 24px;
+  font-size: var(--font-size-brand-icon);
 }
 
 .title-text {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1d2129;
-  letter-spacing: 0.5px;
+  font-size: var(--font-size-title-page);
+  font-weight: var(--font-weight-title);
+  color: var(--color-text-primary);
+  letter-spacing: var(--letter-spacing-tight-title);
 }
 
 .data-table {
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
 .priority-score {
-  font-weight: 700;
-  color: #409EFF;
-  font-size: 15px;
+  font-weight: var(--font-weight-title);
+  color: var(--color-accent);
+  font-size: var(--font-size-accent);
 }
 
 .dialog-content {
-  padding: 0 8px;
+  padding: 0 var(--space-1);
 }
 
 .section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1d2129;
-  margin-bottom: 16px;
-  padding-left: 12px;
-  border-left: 4px solid #409EFF;
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-3);
+  padding-left: var(--space-2);
+  border-left: var(--section-accent-bar-width) solid var(--color-accent);
 }
 
 .request-details {
-  margin-bottom: 24px;
+  margin-bottom: var(--space-5);
 }
 
 .summary-cell {
-  line-height: 1.6;
-  color: #4e5969;
+  line-height: var(--line-height-body);
+  color: var(--color-text-secondary);
 }
 
 .materials-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-1);
 }
 
 .material-tag {
@@ -348,30 +356,21 @@ onMounted(fetchRequests)
 }
 
 .text-muted {
-  color: #86909c;
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
 .assess-form {
-  background-color: #f7f8fa;
-  padding: 24px;
-  border-radius: 8px;
-  border: 1px solid #e5e6eb;
+  background-color: var(--color-surface-form);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  border: var(--border-width-card) solid var(--color-border-subtle);
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding-top: 12px;
-}
-</style>
-
-<style>
-/* Global reset to eliminate edge whitespace for this view */
-html, body {
-  margin: 0;
-  padding: 0;
-  background-color: #f5f7fa;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
 }
 </style>

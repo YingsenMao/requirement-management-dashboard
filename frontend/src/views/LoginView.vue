@@ -13,11 +13,11 @@
           <el-input v-model="form.password" type="password" placeholder="Enter password" show-password />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleLogin" :loading="loading" style="width: 100%;">
+          <el-button type="primary" @click="handleLogin" :loading="loading" class="login-submit">
             Login
           </el-button>
         </el-form-item>
-        <el-alert v-if="errorMsg" :title="errorMsg" type="error" show-icon :closable="false" style="margin-top: 10px;" />
+        <el-alert v-if="errorMsg" :title="errorMsg" type="error" show-icon :closable="false" class="login-alert" />
       </el-form>
     </el-card>
   </div>
@@ -43,13 +43,13 @@ const handleLogin = async () => {
     errorMsg.value = 'Please enter both username and password.'
     return
   }
-  
+
   loading.value = true
   errorMsg.value = ''
-  
+
   const success = await authStore.login(form.value.username, form.value.password)
   loading.value = false
-  
+
   if (success) {
     if (authStore.role === 'admin') {
       router.push('/admin')
@@ -69,32 +69,31 @@ const handleLogin = async () => {
   align-items: center;
   min-height: 100vh;
   width: 100%;
-  background-color: #f0f2f5;
+  background-color: var(--color-surface-auth);
   box-sizing: border-box;
 }
+
 .login-card {
-  width: 400px;
+  width: var(--layout-login-card-width);
 }
+
 .logo-wrapper {
   text-align: center;
 }
+
 .login-logo {
-  max-width: 180px;
+  max-width: var(--layout-login-logo-max);
   height: auto;
   object-fit: contain;
   display: block;
   margin: 0 auto;
 }
-</style>
 
-<style>
-/* Global reset to eliminate default browser margins causing edge whitespace */
-html, body {
-  margin: 0;
-  padding: 0;
+.login-submit {
   width: 100%;
-  height: 100%;
-  background-color: #f0f2f5;
-  overflow-x: hidden;
+}
+
+.login-alert {
+  margin-top: var(--space-2);
 }
 </style>

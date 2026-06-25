@@ -27,6 +27,9 @@ RUN pip install --upgrade pip \
 
 COPY . .
 
+# Create media directory outside of /app to prevent bind mount masking
+RUN mkdir -p /app_media
+
 RUN python manage.py collectstatic --noinput || true
 
 EXPOSE 8000

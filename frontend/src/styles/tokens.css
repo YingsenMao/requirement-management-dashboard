@@ -1,0 +1,63 @@
+/**
+ * Design tokens — mirror these names in Figma Variables (e.g. color/surface/page → --color-surface-page).
+ * Element Plus: https://element-plus.org/en-US/guide/theming.html
+ */
+:root {
+  /* Surfaces */
+  --color-surface-page: #f5f7fa;
+  --color-surface-auth: #f0f2f5;
+  --color-surface-form: #f7f8fa;
+
+  /* Borders */
+  --color-border-default: #e4e7ed;
+  --color-border-subtle: #e5e6eb;
+
+  /* Text */
+  --color-text-primary: #1d2129;
+  --color-text-secondary: #4e5969;
+  --color-text-muted: #86909c;
+
+  /* Accent (aligned with Element Plus primary) */
+  --color-accent: #409eff;
+
+  /* Elevation */
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);
+
+  /* Radius */
+  --radius-lg: 12px;
+  --radius-md: 8px;
+
+  /* Spacing scale (align with Figma spacing variables) */
+  --space-1: 8px;
+  --space-2: 12px;
+  --space-3: 16px;
+  --space-4: 20px;
+  --space-5: 24px;
+  --space-header: 15px;
+
+  /* Typography */
+  --font-size-brand-icon: 24px;
+  --font-size-title-page: 20px;
+  --font-size-section: 16px;
+  --font-size-accent: 15px;
+  --font-weight-title: 700;
+  --font-weight-semibold: 600;
+  --letter-spacing-tight-title: 0.5px;
+  --line-height-body: 1.6;
+
+  /* Layout */
+  --layout-viewport-height: 100vh;
+  --layout-login-card-width: 400px;
+  --layout-login-logo-max: 180px;
+  --border-width-card: 1px;
+  --section-accent-bar-width: 4px;
+
+  /* Element Plus theme (keep in sync with --color-accent) */
+  --el-color-primary: #409eff;
+  --el-color-primary-light-3: #79bbff;
+  --el-color-primary-light-5: #a0cfff;
+  --el-color-primary-light-7: #c6e2ff;
+  --el-color-primary-light-8: #d9ecff;
+  --el-color-primary-light-9: #ecf5ff;
+  --el-color-primary-dark-2: #337ecc;
+}

@@ -9,14 +9,14 @@ class IsAdminUser(permissions.BasePermission):
 
 class IsOwnerAndPendingReview(permissions.BasePermission):
     """
-    Custom permission to only allow owners of an object to edit it,
-    and only if the object's status is 'pending_review'.
-    Read access is allowed to the owner regardless of status.
+    Custom permission:
+    - Read access: Any authenticated user (Global Read).
+    - Write/Delete access: Only the owner, and only if status is 'pending_review'.
     """
     def has_object_permission(self, request, view, obj):
-        # Read permissions are allowed to the owner
+        # Read permissions are allowed to any authenticated user
         if request.method in permissions.SAFE_METHODS:
-            return obj.submitter == request.user
+            return True
         
-        # Write permissions are only allowed to the owner if status is pending_review
+        # Write/Delete permissions are only allowed to the owner if status is pending_review
         return obj.submitter == request.user and obj.status == 'pending_review'
