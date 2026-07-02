@@ -63,6 +63,20 @@
             </div>
             <span v-else class="text-muted">None provided</span>
           </el-descriptions-item>
+          <el-descriptions-item label="Attachments" :span="2">
+            <div v-if="selectedRequest.attachments_list && selectedRequest.attachments_list.length" class="materials-list attachments-list">
+              <el-link 
+                v-for="att in selectedRequest.attachments_list" 
+                :key="att.id" 
+                type="primary" 
+                @click="handleDownload(att.id, getFileName(att.file))" 
+                :underline="false"
+              >
+                {{ getFileName(att.file) }}
+              </el-link>
+            </div>
+            <span v-else class="text-muted">No attachments</span>
+          </el-descriptions-item>
         </el-descriptions>
 
         <el-divider content-position="left">Admin Assessment</el-divider>
@@ -109,6 +123,7 @@ import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import { SwitchButton } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -167,6 +182,35 @@ const submitAssess = async () => {
     console.error('Failed to assess request', error)
   } finally {
     assessing.value = false
+  }
+}
+
+const getFileName = (filePath: string) => {
+  if (!filePath) return 'attachment'
+  return filePath.split('/').pop() || 'attachment'
+}
+
+const handleDownload = async (attachmentId: number, fileName: string) => {
+  try {
+    const response = await axios.get(`/api/attachments/${attachmentId}/download/`, {
+      responseType: 'blob',
+      headers: {
+        Authorization: `Bearer ${authStore.token}`
+      }
+    })
+    
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', fileName)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Download failed', error)
+    ElMessage.error('Failed to download attachment')
   }
 }
 
@@ -242,7 +286,8 @@ const formatType = (type: string) => {
   return map[type] || type
 }
 
-const formatUsers = (users: string) => {
+const formatUsers = (users: string | null | undefined) => {
+  if (!users) return 'N/A'
   const map: Record<string, string> = {
     '<100': '<100',
     '100-500': '100-500',
@@ -349,6 +394,12 @@ onMounted(fetchRequests)
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+}
+
+.attachments-list {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
 }
 
 .material-tag {

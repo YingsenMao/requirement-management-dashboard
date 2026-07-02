@@ -5,7 +5,7 @@ export interface RequirementPayload {
   summary: string
   region: string
   requirement_type: string
-  impacted_users: string
+  impacted_users?: string
   supplementary_materials: string[]
   revenue_impact?: string
   deadline?: string
@@ -20,7 +20,12 @@ const buildFormData = (payload: RequirementPayload): FormData => {
   formData.append('summary', payload.summary)
   formData.append('region', payload.region)
   formData.append('requirement_type', payload.requirement_type)
-  formData.append('impacted_users', payload.impacted_users)
+  
+  if (payload.impacted_users) {
+    formData.append('impacted_users', payload.impacted_users)
+  } else {
+    formData.append('impacted_users', '')
+  }
   
   formData.append('supplementary_materials', JSON.stringify(payload.supplementary_materials || []))
   

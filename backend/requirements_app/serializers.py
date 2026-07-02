@@ -24,6 +24,7 @@ class RequirementRequestSerializer(serializers.ModelSerializer):
     deadline = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
     supplementary_materials = serializers.JSONField(required=False, allow_null=True, default=list)
     revenue_impact = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    impacted_users = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
     
     # Renamed to 'uploaded_files' to avoid shadowing the 'attachments' related manager
     uploaded_files = serializers.ListField(

@@ -65,7 +65,7 @@ class RequirementRequest(models.Model):
     summary = models.TextField()
     region = models.CharField(max_length=20, choices=REGION_CHOICES)
     requirement_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
-    impacted_users = models.CharField(max_length=10, choices=USERS_CHOICES)
+    impacted_users = models.CharField(max_length=10, choices=USERS_CHOICES, null=True, blank=True)
     supplementary_materials = models.JSONField(default=list, blank=True)
     revenue_impact = models.CharField(max_length=10, choices=REVENUE_CHOICES, null=True, blank=True)
     deadline = models.DateField(null=True, blank=True)

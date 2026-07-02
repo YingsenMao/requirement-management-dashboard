@@ -7,8 +7,40 @@
         <el-button type="danger" @click="handleLogout">Logout</el-button>
       </div>
     </div>
+
+    <div v-if="!isAdmin" class="filter-bar">
+      <el-button 
+        :type="filterMyRequirements ? 'primary' : 'default'" 
+        @click="filterMyRequirements = !filterMyRequirements"
+      >
+        My Requirements
+      </el-button>
+      <el-select v-model="filterRegion" placeholder="Region" clearable class="filter-select">
+        <el-option label="China" value="china" />
+        <el-option label="Europe" value="europe" />
+        <el-option label="South America" value="south_america" />
+        <el-option label="North America" value="north_america" />
+        <el-option label="Asia" value="asia" />
+      </el-select>
+      <el-select v-model="filterStatus" placeholder="Status" clearable class="filter-select">
+        <el-option label="Pending Review" value="pending_review" />
+        <el-option label="Under Review" value="under_review" />
+        <el-option label="Confirmed" value="confirmed" />
+        <el-option label="In Development" value="in_development" />
+        <el-option label="Completed" value="completed" />
+        <el-option label="Rejected" value="rejected" />
+      </el-select>
+      <el-select v-model="filterSubmitter" placeholder="Submitter" clearable filterable class="filter-select">
+        <el-option 
+          v-for="user in submitters" 
+          :key="user.id" 
+          :label="user.username" 
+          :value="user.username" 
+        />
+      </el-select>
+    </div>
     
-    <el-table :data="requests" v-loading="loading" stripe class="table-fill">
+    <el-table :data="filteredRequests" v-loading="loading" stripe class="table-fill">
       <el-table-column prop="name" label="Name" min-width="150" />
       <el-table-column prop="submitter_username" label="Submitter" width="120" />
       <el-table-column prop="region" label="Region" width="130">
@@ -79,7 +111,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="Impacted Users" prop="impacted_users">
-          <el-select v-model="createForm.impacted_users" placeholder="Select impacted users" class="field-block">
+          <el-select v-model="createForm.impacted_users" placeholder="Select impacted users" class="field-block" clearable>
             <el-option label="<100" value="<100" />
             <el-option label="100-500" value="100-500" />
             <el-option label="500-1000" value="500-1000" />
@@ -160,7 +192,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="Impacted Users" prop="impacted_users">
-          <el-select v-model="editForm.impacted_users" placeholder="Select impacted users" class="field-block">
+          <el-select v-model="editForm.impacted_users" placeholder="Select impacted users" class="field-block" clearable>
             <el-option label="<100" value="<100" />
             <el-option label="100-500" value="100-500" />
             <el-option label="500-1000" value="500-1000" />
@@ -193,6 +225,7 @@
               :on-change="handleEditChange"
               :on-remove="handleEditRemove"
               :on-exceed="handleExceed"
+              :on-preview="handleEditPreview"
               :limit="3"
               multiple
             >
@@ -231,6 +264,16 @@
         </el-form-item>
         <el-form-item label="Submitter">
           <el-input :model-value="assessForm.submitter_username" disabled />
+        </el-form-item>
+        <el-form-item label="Attachments">
+          <div v-if="assessForm.attachments_list && assessForm.attachments_list.length" class="existing-attachments">
+            <div v-for="att in assessForm.attachments_list" :key="att.id" class="attachment-item">
+              <el-link type="primary" @click="handleDownload(att.id, getFileName(att.file))" :underline="false">
+                {{ getFileName(att.file) }}
+              </el-link>
+            </div>
+          </div>
+          <span v-else class="text-muted">No attachments</span>
         </el-form-item>
         <el-form-item label="Workload" required>
           <el-select v-model="assessForm.workload" placeholder="Select workload" class="field-block">
@@ -290,6 +333,13 @@ const deletedAttachmentIds = ref<number[]>([])
 
 const assessForm = ref<any>({})
 
+// Filter states
+const submitters = ref<{id: number, username: string}[]>([])
+const filterMyRequirements = ref(false)
+const filterRegion = ref('')
+const filterStatus = ref('')
+const filterSubmitter = ref('')
+
 const isAdmin = computed(() => {
   return authStore.role === 'admin'
 })
@@ -299,6 +349,25 @@ const isOwner = (row: any) => {
   const username = authStore.username
   return row.submitter_username === username
 }
+
+const filteredRequests = computed(() => {
+  let result = requests.value
+  if (!isAdmin.value) {
+    if (filterMyRequirements.value) {
+      result = result.filter(r => r.submitter_username === authStore.username)
+    }
+    if (filterRegion.value) {
+      result = result.filter(r => r.region === filterRegion.value)
+    }
+    if (filterStatus.value) {
+      result = result.filter(r => r.status === filterStatus.value)
+    }
+    if (filterSubmitter.value) {
+      result = result.filter(r => r.submitter_username === filterSubmitter.value)
+    }
+  }
+  return result
+})
 
 const createForm = ref({
   name: '',
@@ -324,8 +393,7 @@ const createRules = ref<FormRules>({
   name: [{ required: true, message: 'Please enter requirement name', trigger: 'blur' }],
   summary: [{ required: true, message: 'Please enter summary', trigger: 'blur' }],
   region: [{ required: true, message: 'Please select region', trigger: 'change' }],
-  requirement_type: [{ required: true, message: 'Please select type', trigger: 'change' }],
-  impacted_users: [{ required: true, message: 'Please select impacted users', trigger: 'change' }]
+  requirement_type: [{ required: true, message: 'Please select type', trigger: 'change' }]
 })
 
 const validateUpload = (file: UploadUserFile, uploadFiles: UploadUserFile[], fileListRef: Ref<UploadUserFile[]>, stagedFilesRef: Ref<File[]>) => {
@@ -404,6 +472,12 @@ const handleDownload = async (attachmentId: number, fileName: string) => {
   }
 }
 
+const handleEditPreview = (file: UploadUserFile) => {
+  if ((file as any).id) {
+    handleDownload((file as any).id, file.name)
+  }
+}
+
 const fetchRequests = async () => {
   loading.value = true
   try {
@@ -426,6 +500,17 @@ const fetchRequests = async () => {
     console.error('Failed to fetch requests', error)
   } finally {
     loading.value = false
+  }
+}
+
+const fetchSubmitters = async () => {
+  try {
+    const response = await axios.get('/api/users/', {
+      headers: { Authorization: `Bearer ${authStore.token}` }
+    })
+    submitters.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch submitters', error)
   }
 }
 
@@ -474,7 +559,7 @@ const handleEdit = (row: any) => {
   // Map existing attachments to el-upload file list format so they are visible and downloadable
   const existingFiles = (row.attachments_list || []).map((att: any) => ({
     name: getFileName(att.file),
-    url: att.file,
+    // Do not set url to prevent default browser navigation
     id: att.id,
     status: 'success'
   }))
@@ -617,7 +702,10 @@ const formatWorkload = (workload: string) => {
   return map[workload] || workload
 }
 
-onMounted(fetchRequests)
+onMounted(() => {
+  fetchRequests()
+  fetchSubmitters()
+})
 </script>
 
 <style scoped>
@@ -653,6 +741,18 @@ onMounted(fetchRequests)
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-4);
+}
+
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  width: 180px;
 }
 
 .existing-attachments {

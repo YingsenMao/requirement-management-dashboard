@@ -8,7 +8,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django.db.models import F
 from django.http import FileResponse, Http404
-from .models import RequirementRequest, Attachment
+from .models import RequirementRequest, Attachment, CustomUser
 from .serializers import RequirementRequestSerializer, AdminRequirementSerializer
 from .permissions import IsOwnerAndPendingReview, IsAdminUser
 
@@ -41,6 +41,17 @@ class AdminRequirementViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Admins see all requests, sorted by priority score descending, nulls last
         return RequirementRequest.objects.all().order_by(F('priority_score').desc(nulls_last=True))
+
+
+class UserListView(APIView):
+    """
+    Returns a list of all regular users (for the Submitter filter).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        users = CustomUser.objects.filter(role='user').values('id', 'username')
+        return Response(list(users))
 
 
 class AttachmentDownloadView(APIView):
