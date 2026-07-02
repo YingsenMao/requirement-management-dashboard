@@ -179,7 +179,7 @@
           <template v-if="isFormLocked">
             <div v-if="editForm.attachments_list && editForm.attachments_list.length" class="existing-attachments">
               <div v-for="att in editForm.attachments_list" :key="att.id" class="attachment-item">
-                <el-link type="primary" :href="att.file" target="_blank" :underline="false">
+                <el-link type="primary" @click="handleDownload(att.id, getFileName(att.file))" :underline="false">
                   {{ getFileName(att.file) }}
                 </el-link>
               </div>
@@ -378,6 +378,30 @@ const handleExceed: UploadProps['onExceed'] = () => {
 const getFileName = (filePath: string) => {
   if (!filePath) return 'attachment'
   return filePath.split('/').pop() || 'attachment'
+}
+
+const handleDownload = async (attachmentId: number, fileName: string) => {
+  try {
+    const response = await axios.get(`/api/attachments/${attachmentId}/download/`, {
+      responseType: 'blob',
+      headers: {
+        Authorization: `Bearer ${authStore.token}`
+      }
+    })
+    
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', fileName)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Download failed', error)
+    ElMessage.error('Failed to download attachment')
+  }
 }
 
 const fetchRequests = async () => {
