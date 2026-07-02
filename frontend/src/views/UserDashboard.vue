@@ -487,8 +487,13 @@ const fetchRequests = async () => {
     })
     const data = response.data
     
-    // Frontend sort guarantee: Priority Score descending, N/A (null) at the bottom
+    // Frontend sort guarantee: 
+    // 1. Completed status at the very bottom
+    // 2. Priority Score descending, N/A (null) at the bottom
     data.sort((a: any, b: any) => {
+      if (a.status === 'completed' && b.status !== 'completed') return 1
+      if (a.status !== 'completed' && b.status === 'completed') return -1
+      
       if (a.priority_score === null && b.priority_score === null) return 0
       if (a.priority_score === null) return 1
       if (b.priority_score === null) return -1

@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
-from django.db.models import F
+from django.db.models import F, Case, When, Value, IntegerField
 from django.http import FileResponse, Http404
 from .models import RequirementRequest, Attachment, CustomUser
 from .serializers import RequirementRequestSerializer, AdminRequirementSerializer
@@ -23,8 +23,14 @@ class UserRequirementViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Users can view all requests (Global Read), but permissions will restrict editing
-        # Sort by priority score descending, nulls last, then by submission date descending
-        return RequirementRequest.objects.all().order_by(F('priority_score').desc(nulls_last=True), '-submission_date')
+        # Sort by: 1. Completed status at the bottom, 2. Priority score descending (nulls last), 3. Submission date descending
+        return RequirementRequest.objects.annotate(
+            is_completed=Case(
+                When(status='completed', then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        ).order_by('is_completed', F('priority_score').desc(nulls_last=True), '-submission_date')
 
     def perform_create(self, serializer):
         # Automatically assign the current user as the submitter
@@ -39,8 +45,14 @@ class AdminRequirementViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        # Admins see all requests, sorted by priority score descending, nulls last
-        return RequirementRequest.objects.all().order_by(F('priority_score').desc(nulls_last=True))
+        # Admins see all requests, sorted with completed at the bottom, then by priority score descending (nulls last)
+        return RequirementRequest.objects.annotate(
+            is_completed=Case(
+                When(status='completed', then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        ).order_by('is_completed', F('priority_score').desc(nulls_last=True), '-submission_date')
 
 
 class UserListView(APIView):
