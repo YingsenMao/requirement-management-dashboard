@@ -39,13 +39,13 @@ def calculate_priority_score(instance):
 
     # Supplementary Materials Weights (+5 per item, max +20)
     if instance.supplementary_materials:
-        score += min(len(instance.supplementary_materials) * 5, 20)
+        score += min(len(instance.supplementary_materials) * 20, 50)
 
     # Workload Weights (Quick wins prioritized)
     workload_scores = {
         'small': 50,
-        'medium': 30,
-        'large': 0,
+        'medium': 10,
+        'large': -10,
     }
     score += workload_scores.get(instance.workload, 0)
 
