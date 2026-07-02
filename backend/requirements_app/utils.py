@@ -43,8 +43,8 @@ def calculate_priority_score(instance):
 
     # Workload Weights (Quick wins prioritized)
     workload_scores = {
-        'small': 30,
-        'medium': 15,
+        'small': 50,
+        'medium': 30,
         'large': 0,
     }
     score += workload_scores.get(instance.workload, 0)
