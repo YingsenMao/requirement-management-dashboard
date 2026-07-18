@@ -14,14 +14,6 @@ class CustomUser(AbstractUser):
 
 
 class RequirementRequest(models.Model):
-    REGION_CHOICES = [
-        ('china', 'China'),
-        ('europe', 'Europe'),
-        ('south_america', 'South America'),
-        ('north_america', 'North America'),
-        ('asia', 'Asia'),
-    ]
-
     TYPE_CHOICES = [
         ('regulatory', 'Regulatory Compliance'),
         ('security', 'Security Vulnerability'),
@@ -52,6 +44,12 @@ class RequirementRequest(models.Model):
         ('small', 'Small'),
     ]
 
+    URGENCY_CHOICES = [
+        ('high', 'High'),
+        ('medium', 'Medium'),
+        ('low', 'Low'),
+    ]
+
     STATUS_CHOICES = [
         ('pending_review', 'Pending Review'),
         ('under_review', 'Under Review'),
@@ -63,7 +61,7 @@ class RequirementRequest(models.Model):
 
     name = models.CharField(max_length=255)
     summary = models.TextField()
-    region = models.CharField(max_length=20, choices=REGION_CHOICES)
+    country = models.CharField(max_length=100)
     requirement_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     impacted_users = models.CharField(max_length=10, choices=USERS_CHOICES, null=True, blank=True)
     supplementary_materials = models.JSONField(default=list, blank=True)
@@ -74,6 +72,9 @@ class RequirementRequest(models.Model):
     workload = models.CharField(max_length=10, choices=WORKLOAD_CHOICES, default='pending')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending_review')
     priority_score = models.IntegerField(null=True, blank=True)
+    reject_reason = models.TextField(null=True, blank=True)
+    estimated_completion_date = models.DateField(null=True, blank=True)
+    urgency = models.CharField(max_length=10, choices=URGENCY_CHOICES, default='medium')
     
     submitter = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='requirements')
 

@@ -22,7 +22,7 @@ def get_base_payload():
     return {
         'name': 'Test Requirement',
         'summary': 'Test Summary',
-        'region': 'china',
+        'country': 'China',
         'requirement_type': 'bug',
         'impacted_users': '<100',
     }

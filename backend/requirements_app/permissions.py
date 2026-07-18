@@ -11,12 +11,10 @@ class IsOwnerAndPendingReview(permissions.BasePermission):
     """
     Custom permission:
     - Read access: Any authenticated user (Global Read).
-    - Write/Delete access: Only the owner, and only if status is 'pending_review'.
+    - Write/Delete access: Only the owner, and only if status is 'pending_review' or 'rejected'.
     """
     def has_object_permission(self, request, view, obj):
-        # Read permissions are allowed to any authenticated user
         if request.method in permissions.SAFE_METHODS:
             return True
         
-        # Write/Delete permissions are only allowed to the owner if status is pending_review
-        return obj.submitter == request.user and obj.status == 'pending_review'
+        return obj.submitter == request.user and obj.status in ('pending_review', 'rejected')

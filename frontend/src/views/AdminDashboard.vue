@@ -37,6 +37,11 @@
             {{ formatDate(scope.row.submission_date) }}
           </template>
         </el-table-column>
+        <el-table-column prop="estimated_completion_date" label="Est. Completion" width="150">
+          <template #default="scope">
+            {{ scope.row.estimated_completion_date || 'N/A' }}
+          </template>
+        </el-table-column>
         <el-table-column label="Actions" width="140" fixed="right" align="center">
           <template #default="scope">
             <el-button size="small" type="primary" @click="handleAssess(scope.row)">Assess</el-button>
@@ -51,11 +56,14 @@
         <div class="section-title">Submitted Request Details</div>
         <el-descriptions :column="2" border size="default" class="request-details">
           <el-descriptions-item label="Name">{{ selectedRequest.name }}</el-descriptions-item>
-          <el-descriptions-item label="Region">{{ formatRegion(selectedRequest.region) }}</el-descriptions-item>
+          <el-descriptions-item label="Country">{{ selectedRequest.country }}</el-descriptions-item>
           <el-descriptions-item label="Requirement Type">{{ formatType(selectedRequest.requirement_type) }}</el-descriptions-item>
           <el-descriptions-item label="Impacted Users">{{ formatUsers(selectedRequest.impacted_users) }}</el-descriptions-item>
           <el-descriptions-item label="Revenue Impact">{{ formatRevenue(selectedRequest.revenue_impact) }}</el-descriptions-item>
           <el-descriptions-item label="Deadline">{{ selectedRequest.deadline || 'N/A' }}</el-descriptions-item>
+          <el-descriptions-item label="Urgency">
+            <el-tag :type="getUrgencyType(selectedRequest.urgency)" effect="light" round>{{ formatUrgency(selectedRequest.urgency) }}</el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="Summary" :span="2" class="summary-cell">{{ selectedRequest.summary }}</el-descriptions-item>
           <el-descriptions-item label="Supplementary Materials" :span="2">
             <div v-if="selectedRequest.supplementary_materials && selectedRequest.supplementary_materials.length" class="materials-list">
@@ -105,6 +113,12 @@
               </el-form-item>
             </el-col>
           </el-row>
+          <el-form-item v-if="assessForm.status === 'rejected'" label="Reject Reason">
+            <el-input v-model="assessForm.reject_reason" type="textarea" :rows="3" placeholder="Please provide a reason for rejection" />
+          </el-form-item>
+          <el-form-item label="Est. Completion">
+            <el-date-picker v-model="assessForm.estimated_completion_date" type="date" placeholder="Select date" class="field-block" value-format="YYYY-MM-DD" clearable />
+          </el-form-item>
         </el-form>
       </div>
       <template #footer>
@@ -137,7 +151,9 @@ const selectedRequest = ref<any>(null)
 
 const assessForm = ref({
   workload: '',
-  status: ''
+  status: '',
+  reject_reason: '' as string | null,
+  estimated_completion_date: null as string | null
 })
 
 const fetchRequests = async () => {
@@ -164,16 +180,30 @@ const handleAssess = (row: any) => {
   selectedRequest.value = row
   assessForm.value = {
     workload: row.workload,
-    status: row.status
+    status: row.status,
+    reject_reason: row.reject_reason || '',
+    estimated_completion_date: row.estimated_completion_date || null
   }
   showAssessDialog.value = true
 }
 
 const submitAssess = async () => {
   if (assessingId.value === null) return
+  if (assessForm.value.status === 'rejected' && !assessForm.value.reject_reason?.trim()) {
+    ElMessage.warning('Please provide a reject reason')
+    return
+  }
   assessing.value = true
   try {
-    await axios.patch(`/api/admin/requests/${assessingId.value}/`, assessForm.value, {
+    const payload: any = {
+      workload: assessForm.value.workload,
+      status: assessForm.value.status,
+      estimated_completion_date: assessForm.value.estimated_completion_date || null
+    }
+    if (assessForm.value.status === 'rejected') {
+      payload.reject_reason = assessForm.value.reject_reason
+    }
+    await axios.patch(`/api/admin/requests/${assessingId.value}/`, payload, {
       headers: { Authorization: `Bearer ${authStore.token}` }
     })
     showAssessDialog.value = false
@@ -263,17 +293,6 @@ const getWorkloadType = (workload: string) => {
   return map[workload] || 'info'
 }
 
-const formatRegion = (region: string) => {
-  const map: Record<string, string> = {
-    china: 'China',
-    europe: 'Europe',
-    south_america: 'South America',
-    north_america: 'North America',
-    asia: 'Asia'
-  }
-  return map[region] || region
-}
-
 const formatType = (type: string) => {
   const map: Record<string, string> = {
     regulatory: 'Regulatory Compliance',
@@ -306,6 +325,25 @@ const formatRevenue = (rev: string | null) => {
     '>1M': '>1M'
   }
   return map[rev] || rev
+}
+
+const formatUrgency = (urgency: string | null) => {
+  if (!urgency) return 'N/A'
+  const map: Record<string, string> = {
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low'
+  }
+  return map[urgency] || urgency
+}
+
+const getUrgencyType = (urgency: string | null) => {
+  const map: Record<string, string> = {
+    high: 'danger',
+    medium: 'warning',
+    low: 'info'
+  }
+  return map[urgency || ''] || 'info'
 }
 
 onMounted(fetchRequests)

@@ -42,16 +42,20 @@ class RequirementRequestSerializer(serializers.ModelSerializer):
         default=list
     )
     
+    reject_reason = serializers.CharField(read_only=True, allow_null=True)
+    estimated_completion_date = serializers.DateField(read_only=True, allow_null=True)
+
     class Meta:
         model = RequirementRequest
         fields = [
-            'id', 'name', 'summary', 'region', 'requirement_type', 
+            'id', 'name', 'summary', 'country', 'requirement_type', 
             'impacted_users', 'supplementary_materials', 'revenue_impact', 
             'deadline', 'submission_date', 'workload', 'status', 
             'priority_score', 'submitter', 'submitter_username',
-            'uploaded_files', 'attachments_list', 'deleted_attachment_ids'
+            'uploaded_files', 'attachments_list', 'deleted_attachment_ids',
+            'reject_reason', 'estimated_completion_date', 'urgency'
         ]
-        read_only_fields = ['id', 'submission_date', 'priority_score', 'submitter', 'submitter_username']
+        read_only_fields = ['id', 'submission_date', 'priority_score', 'submitter', 'submitter_username', 'reject_reason', 'estimated_completion_date']
 
     def validate_deadline(self, value):
         if value is None or value == '':
@@ -127,22 +131,33 @@ class RequirementRequestSerializer(serializers.ModelSerializer):
 class AdminRequirementSerializer(serializers.ModelSerializer):
     """
     Serializer specifically for Admins assessing requirements.
-    Restricts write access strictly to 'workload' and 'status'.
+    Restricts write access strictly to 'workload', 'status', 'reject_reason', and 'estimated_completion_date'.
     """
     submitter_username = serializers.CharField(source='submitter.username', read_only=True)
     attachments_list = AttachmentSerializer(source='attachments', many=True, read_only=True)
+    estimated_completion_date = serializers.DateField(required=False, allow_null=True, input_formats=['%Y-%m-%d', 'iso-8601'])
     
     class Meta:
         model = RequirementRequest
         fields = [
-            'id', 'name', 'summary', 'region', 'requirement_type', 
+            'id', 'name', 'summary', 'country', 'requirement_type', 
             'impacted_users', 'supplementary_materials', 'revenue_impact', 
             'deadline', 'submission_date', 'workload', 'status', 
-            'priority_score', 'submitter', 'submitter_username', 'attachments_list'
+            'priority_score', 'submitter', 'submitter_username', 'attachments_list',
+            'reject_reason', 'estimated_completion_date', 'urgency'
         ]
         read_only_fields = [
-            'id', 'name', 'summary', 'region', 'requirement_type', 
+            'id', 'name', 'summary', 'country', 'requirement_type', 
             'impacted_users', 'supplementary_materials', 'revenue_impact', 
             'deadline', 'submission_date', 'priority_score', 'submitter', 
-            'submitter_username', 'attachments_list'
+            'submitter_username', 'attachments_list', 'urgency'
         ]
+
+    def validate(self, data):
+        status = data.get('status', getattr(self.instance, 'status', None))
+        reject_reason = data.get('reject_reason', getattr(self.instance, 'reject_reason', None))
+        if status == 'rejected' and not reject_reason:
+            raise serializers.ValidationError({"reject_reason": "Reject reason is required when status is Rejected."})
+        if status != 'rejected':
+            data['reject_reason'] = None
+        return data

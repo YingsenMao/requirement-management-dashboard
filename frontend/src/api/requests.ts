@@ -3,12 +3,13 @@ import axios from 'axios'
 export interface RequirementPayload {
   name: string
   summary: string
-  region: string
+  country: string
   requirement_type: string
   impacted_users?: string
   supplementary_materials: string[]
   revenue_impact?: string
   deadline?: string
+  urgency?: string
   attachments?: File[]
   deleted_attachment_ids?: number[]
 }
@@ -18,7 +19,7 @@ const buildFormData = (payload: RequirementPayload): FormData => {
 
   formData.append('name', payload.name)
   formData.append('summary', payload.summary)
-  formData.append('region', payload.region)
+  formData.append('country', payload.country)
   formData.append('requirement_type', payload.requirement_type)
   
   if (payload.impacted_users) {
@@ -35,6 +36,10 @@ const buildFormData = (payload: RequirementPayload): FormData => {
   
   if (payload.deadline) {
     formData.append('deadline', payload.deadline)
+  }
+
+  if (payload.urgency) {
+    formData.append('urgency', payload.urgency)
   }
 
   // Match the renamed serializer field 'uploaded_files'
@@ -73,7 +78,7 @@ export const updateRequirementRequest = async (token: string, id: number, payloa
   })
 }
 
-export const assessRequirementRequest = async (token: string, id: number, payload: { workload: string, status: string }) => {
+export const assessRequirementRequest = async (token: string, id: number, payload: { workload: string, status: string, reject_reason?: string | null, estimated_completion_date?: string | null }) => {
   return axios.patch(`/api/admin/requests/${id}/`, payload, {
     headers: {
       Authorization: `Bearer ${token}`,

@@ -62,7 +62,7 @@ def test_create_requirement_request_defaults():
     req = RequirementRequest.objects.create(
         name='Test Requirement',
         summary='This is a test summary.',
-        region='china',
+        country='China',
         requirement_type='bug',
         impacted_users='<100',
         submitter=user
@@ -78,7 +78,7 @@ def test_create_requirement_request_defaults():
 def test_priority_score_pending_workload():
     user = User.objects.create_user(username='test_user', password='pass')
     req = RequirementRequest.objects.create(
-        name='Test', summary='Test', region='china', requirement_type='regulatory',
+        name='Test', summary='Test', country='China', requirement_type='regulatory',
         impacted_users='>1000', revenue_impact='>1M', supplementary_materials=['a', 'b', 'c', 'd', 'e'],
         workload='pending', submitter=user
     )
@@ -88,7 +88,7 @@ def test_priority_score_pending_workload():
 def test_priority_score_small_workload():
     user = User.objects.create_user(username='test_user', password='pass')
     req = RequirementRequest.objects.create(
-        name='Test', summary='Test', region='china', requirement_type='regulatory',
+        name='Test', summary='Test', country='China', requirement_type='regulatory',
         impacted_users='>1000', revenue_impact='>1M', supplementary_materials=['a', 'b', 'c', 'd'],
         workload='small', submitter=user
     )
@@ -99,7 +99,7 @@ def test_priority_score_small_workload():
 def test_priority_score_medium_workload():
     user = User.objects.create_user(username='test_user', password='pass')
     req = RequirementRequest.objects.create(
-        name='Test', summary='Test', region='china', requirement_type='bug',
+        name='Test', summary='Test', country='China', requirement_type='bug',
         impacted_users='<100', revenue_impact=None, supplementary_materials=[],
         workload='medium', submitter=user
     )
@@ -110,7 +110,7 @@ def test_priority_score_medium_workload():
 def test_priority_score_large_workload():
     user = User.objects.create_user(username='test_user', password='pass')
     req = RequirementRequest.objects.create(
-        name='Test', summary='Test', region='china', requirement_type='optimization',
+        name='Test', summary='Test', country='China', requirement_type='optimization',
         impacted_users='100-500', revenue_impact='50k-300k', supplementary_materials=['a'],
         workload='large', submitter=user
     )
@@ -122,8 +122,8 @@ def test_user_global_read_and_owner_write():
     user1 = User.objects.create_user(username='user1', password='pass')
     user2 = User.objects.create_user(username='user2', password='pass')
     
-    req1 = RequirementRequest.objects.create(name='Req1', summary='Sum1', region='china', requirement_type='bug', impacted_users='<100', submitter=user1)
-    req2 = RequirementRequest.objects.create(name='Req2', summary='Sum2', region='china', requirement_type='bug', impacted_users='<100', submitter=user2)
+    req1 = RequirementRequest.objects.create(name='Req1', summary='Sum1', country='China', requirement_type='bug', impacted_users='<100', submitter=user1)
+    req2 = RequirementRequest.objects.create(name='Req2', summary='Sum2', country='China', requirement_type='bug', impacted_users='<100', submitter=user2)
     
     client = APIClient()
     client.force_authenticate(user=user1)
@@ -152,7 +152,7 @@ def test_user_global_read_and_owner_write():
 @pytest.mark.django_db
 def test_user_locking_mechanism():
     user = User.objects.create_user(username='user_lock', password='pass')
-    req = RequirementRequest.objects.create(name='LockedReq', summary='Sum', region='china', requirement_type='bug', impacted_users='<100', submitter=user, status='confirmed')
+    req = RequirementRequest.objects.create(name='LockedReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user, status='confirmed')
     
     client = APIClient()
     client.force_authenticate(user=user)
@@ -166,8 +166,8 @@ def test_admin_view_and_sorting():
     admin = User.objects.create_user(username='admin_sort', password='pass', role='admin')
     user = User.objects.create_user(username='user_sort', password='pass')
     
-    RequirementRequest.objects.create(name='LowScore', summary='Sum', region='china', requirement_type='optimization', impacted_users='<100', submitter=user, workload='large')
-    RequirementRequest.objects.create(name='HighScore', summary='Sum', region='china', requirement_type='regulatory', impacted_users='>1000', submitter=user, workload='small')
+    RequirementRequest.objects.create(name='LowScore', summary='Sum', country='China', requirement_type='optimization', impacted_users='<100', submitter=user, workload='large')
+    RequirementRequest.objects.create(name='HighScore', summary='Sum', country='China', requirement_type='regulatory', impacted_users='>1000', submitter=user, workload='small')
     
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -183,7 +183,7 @@ def test_admin_view_and_sorting():
 def test_admin_update_workload_and_status():
     admin = User.objects.create_user(username='admin_update', password='pass', role='admin')
     user = User.objects.create_user(username='user_update', password='pass')
-    req = RequirementRequest.objects.create(name='UpdateReq', summary='Sum', region='china', requirement_type='bug', impacted_users='<100', submitter=user)
+    req = RequirementRequest.objects.create(name='UpdateReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
     
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -199,7 +199,7 @@ def test_admin_field_level_restrictions():
     admin = User.objects.create_user(username='admin_restrict', password='pass', role='admin')
     user = User.objects.create_user(username='user_restrict', password='pass')
     req = RequirementRequest.objects.create(
-        name='OriginalName', summary='Sum', region='china', 
+        name='OriginalName', summary='Sum', country='China', 
         requirement_type='bug', impacted_users='<100', submitter=user
     )
     
@@ -215,3 +215,115 @@ def test_admin_field_level_restrictions():
     response = client.patch(f'/api/admin/requests/{req.id}/', {'name': 'HackedName'}, format='json')
     assert response.status_code == 200
     assert response.data['name'] == 'OriginalName'
+
+@pytest.mark.django_db
+def test_admin_reject_with_reason():
+    admin = User.objects.create_user(username='admin_reject', password='pass', role='admin')
+    user = User.objects.create_user(username='user_reject', password='pass')
+    req = RequirementRequest.objects.create(name='RejectReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.patch(f'/api/admin/requests/{req.id}/', {'workload': 'small', 'status': 'rejected', 'reject_reason': 'Insufficient data'}, format='json')
+    assert response.status_code == 200
+    assert response.data['status'] == 'rejected'
+    assert response.data['reject_reason'] == 'Insufficient data'
+
+@pytest.mark.django_db
+def test_admin_reject_without_reason_fails():
+    admin = User.objects.create_user(username='admin_reject2', password='pass', role='admin')
+    user = User.objects.create_user(username='user_reject2', password='pass')
+    req = RequirementRequest.objects.create(name='RejectReq2', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.patch(f'/api/admin/requests/{req.id}/', {'workload': 'small', 'status': 'rejected'}, format='json')
+    assert response.status_code == 400
+
+@pytest.mark.django_db
+def test_user_can_edit_rejected_requirement():
+    user = User.objects.create_user(username='user_edit_rejected', password='pass')
+    req = RequirementRequest.objects.create(name='RejectedReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user, status='rejected', reject_reason='Not enough info')
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.patch(f'/api/requests/{req.id}/', {'name': 'UpdatedReq'}, format='json')
+    assert response.status_code == 200
+    assert response.data['name'] == 'UpdatedReq'
+    assert response.data['status'] == 'pending_review'
+    assert response.data['reject_reason'] is None
+
+@pytest.mark.django_db
+def test_non_rejected_status_clears_reject_reason():
+    admin = User.objects.create_user(username='admin_clear', password='pass', role='admin')
+    user = User.objects.create_user(username='user_clear', password='pass')
+    req = RequirementRequest.objects.create(name='ClearReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user, status='rejected', reject_reason='Old reason')
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.patch(f'/api/admin/requests/{req.id}/', {'workload': 'small', 'status': 'confirmed'}, format='json')
+    assert response.status_code == 200
+    assert response.data['status'] == 'confirmed'
+    assert response.data['reject_reason'] is None
+
+@pytest.mark.django_db
+def test_admin_set_estimated_completion_date():
+    admin = User.objects.create_user(username='admin_ecd', password='pass', role='admin')
+    user = User.objects.create_user(username='user_ecd', password='pass')
+    req = RequirementRequest.objects.create(name='ECDReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.patch(f'/api/admin/requests/{req.id}/', {'workload': 'small', 'status': 'confirmed', 'estimated_completion_date': '2026-08-15'}, format='json')
+    assert response.status_code == 200
+    assert response.data['estimated_completion_date'] == '2026-08-15'
+
+@pytest.mark.django_db
+def test_user_cannot_set_estimated_completion_date():
+    user = User.objects.create_user(username='user_ecd_forbidden', password='pass')
+    req = RequirementRequest.objects.create(name='ECDReq2', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.patch(f'/api/requests/{req.id}/', {'name': 'Updated', 'estimated_completion_date': '2026-08-15'}, format='json')
+    assert response.status_code == 200
+    assert response.data['estimated_completion_date'] is None
+
+@pytest.mark.django_db
+def test_urgency_default_medium():
+    user = User.objects.create_user(username='user_urgency', password='pass')
+    req = RequirementRequest.objects.create(name='UrgReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
+    assert req.urgency == 'medium'
+
+@pytest.mark.django_db
+def test_user_can_set_urgency():
+    user = User.objects.create_user(username='user_urgency_set', password='pass')
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post('/api/requests/', {
+        'name': 'UrgReq2', 'summary': 'Sum', 'country': 'China',
+        'requirement_type': 'bug', 'urgency': 'high'
+    }, format='json')
+    assert response.status_code == 201
+    assert response.data['urgency'] == 'high'
+
+@pytest.mark.django_db
+def test_admin_cannot_modify_urgency():
+    admin = User.objects.create_user(username='admin_urgency', password='pass', role='admin')
+    user = User.objects.create_user(username='user_urgency_owner', password='pass')
+    req = RequirementRequest.objects.create(name='UrgReq3', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user, urgency='low')
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.patch(f'/api/admin/requests/{req.id}/', {'workload': 'small', 'status': 'confirmed', 'urgency': 'high'}, format='json')
+    assert response.status_code == 200
+    assert response.data['urgency'] == 'low'

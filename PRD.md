@@ -8,6 +8,10 @@
 - 2024-05-24: Iteration - Updated regular user visibility to allow viewing all requirements (read-only for others'). Added "Submitter" column to the list. Restricted Admin edit rights to only `workload` and `status` fields via an "Assess" action. (AI)
 - 2024-05-24: Iteration - Added 'Region' column to the requirement list. Updated sorting logic to strictly order by Priority Score descending with unassessed (N/A) items at the bottom. (AI)
 - 2026-07-18: Corrected Priority Scoring formula to match actual implementation: Bug=+30, Revenue Growth=+20, Revenue Impact >1M=+50, Supplementary Materials=+20/item (max +50), Workload Small=+50/Medium=+10/Large=-10. (AI)
+- 2026-07-18: Added Reject workflow - Admin must provide reject_reason when rejecting; Users see hoverable reject reason indicator; Rejected requirements can be re-edited by owner (status resets to Pending Review). (AI)
+- 2026-07-18: Added Estimated Completion Date - Admin can optionally set an estimated completion date during assessment; visible to all users in the requirement list. (AI)
+- 2026-07-18: Changed Region field to Country - replaced fixed region choices with a searchable global country list (195 countries); existing data migrated to "China". (AI)
+- 2026-07-18: Added Urgency field (High/Medium/Low) to requirement form - for reference only, not included in priority score calculation; Admin can view it during assessment. (AI)
 
 ## Project overview
 This project is a SaaS Requirements Management Platform designed for Product Managers to collect, manage, and prioritize feature requests from global users. The system allows administrators to create user accounts, while regular users can submit and track their requirement requests. The core value of the platform is its automated priority scoring system, which helps PMs objectively rank requests based on ROI and risk factors.
@@ -15,7 +19,7 @@ This project is a SaaS Requirements Management Platform designed for Product Man
 ## Core requirements
 1. **Role-Based Access Control (RBAC):** Two distinct roles: Admin (Product Manager) and Regular User.
 2. **Data Visibility & Isolation:** Regular users can view all requirements in the system to foster transparency, but they can only edit/delete the requirements they created themselves (and only when in "Pending Review" status). Other users' requirements are strictly read-only for them. Admins can view all requests.
-3. **State Machine & Locking:** Requests have a lifecycle (Status). Once a request moves past the initial "Pending Review" state, it becomes strictly read-only for the regular user to prevent scope creep.
+3. **State Machine & Locking:** Requests have a lifecycle (Status). Once a request moves past the initial "Pending Review" state, it becomes strictly read-only for the regular user to prevent scope creep. **Exception:** When status is "Rejected", the owner can re-edit the requirement, which resets status to "Pending Review" and clears the reject reason.
 4. **Automated Priority Scoring:** A weighted scoring algorithm calculates the priority of a request. To ensure accuracy, the score is only calculated and displayed after the Admin has assessed and inputted the "Workload".
 5. **Admin Assessment Restrictions:** Admins are strictly limited to editing only the "Workload" and "Status" fields when assessing a requirement. They cannot modify the original content submitted by the user.
 6. **File Storage & Persistence:** Uploaded files (requirement descriptions, market research) will be stored locally on the server using Docker named volumes (`media_volume`) to ensure persistence across container restarts. Nginx will serve these files directly to optimize backend performance.
@@ -30,21 +34,22 @@ This project is a SaaS Requirements Management Platform designed for Product Man
 - **Submit Request:** Users can submit a new requirement with the following fields:
   - Name (Required, Text)
   - Summary (Required, Text)
-  - Region (Required, Select: China, Europe, South America, North America, Asia)
+  - Country (Required, Select with fuzzy search: global country list)
   - Requirement Type (Required, Select: Regulatory Compliance, Security Vulnerability, Revenue Growth, Cost Reduction, Bug, Feature Optimization)
   - Impacted Users (Required, Select: <100, 100-500, 500-1000, >1000)
   - Supplementary Materials (Optional, Multi-select: User Research, Data Report, Competitor Analysis, Technical Solution)
   - Revenue Impact in USD (Optional, Select: <50k, 50k-300k, 300k-1M, >1M)
   - Deadline (Optional, Date)
+  - Urgency (Optional, Select: High, Medium, Low - default Medium; for reference only, not used in priority scoring)
   - Attachments (Optional, File Upload: Max 3 files, max 5MB each, allowed types: .pdf, .docx, .xlsx, .png, .jpg)
-- **View Requests:** Users can view a global list of all requirements. The list includes "Submitter" and "Region" columns. The list is sorted by Priority Score (descending), with unassessed requests (N/A) at the bottom. Users can only edit or delete requirements they created themselves (if Status is "Pending Review"). All other requirements are read-only.
-- **Edit Requests:** Users can edit their requests *only if* the Status is "Pending Review". They cannot edit Workload, Status, or Priority Score. They can add or remove attachments within the defined constraints.
+- **View Requests:** Users can view a global list of all requirements. The list includes "Submitter", "Country", and "Est. Completion" columns. The list is sorted by Priority Score (descending), with unassessed requests (N/A) at the bottom. Users can only edit or delete requirements they created themselves (if Status is "Pending Review" or "Rejected"). All other requirements are read-only. When a requirement is "Rejected", the Status column shows a hoverable indicator displaying the reject reason.
+- **Edit Requests:** Users can edit their requests *only if* the Status is "Pending Review" or "Rejected". They cannot edit Workload, Status, or Priority Score. They can add or remove attachments within the defined constraints. When editing a "Rejected" requirement, the status automatically resets to "Pending Review" and the reject reason is cleared.
 
 ### 3. Requirement Management & Prioritization (Admin)
-- **Global View:** Admins can view all requests submitted by all users. The list includes the "Region" column and is sorted by Priority Score in descending order, with unassessed requests (N/A) at the bottom.
+- **Global View:** Admins can view all requests submitted by all users. The list includes the "Country" and "Est. Completion" columns and is sorted by Priority Score in descending order, with unassessed requests (N/A) at the bottom.
 - **Sorting:** The request list is sorted by Priority Score in descending order by default.
 - **Admin Fields:** Admins can see the Submitter's Username and the Priority Score.
-- **Assessment:** Admins can assess any requirement by clicking an "Assess" button, which allows them to edit *only* the Workload and Status fields.
+- **Assessment:** Admins can assess any requirement by clicking an "Assess" button, which allows them to edit *only* the Workload, Status, and optionally the Estimated Completion Date fields. When selecting "Rejected" status, a mandatory "Reject Reason" text field appears.
 - **File Access:** Admins can view and download all attachments associated with any request.
 
 ### 4. Priority Scoring Logic

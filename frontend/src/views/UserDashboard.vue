@@ -15,12 +15,8 @@
       >
         My Requirements
       </el-button>
-      <el-select v-model="filterRegion" placeholder="Region" clearable class="filter-select">
-        <el-option label="China" value="china" />
-        <el-option label="Europe" value="europe" />
-        <el-option label="South America" value="south_america" />
-        <el-option label="North America" value="north_america" />
-        <el-option label="Asia" value="asia" />
+      <el-select v-model="filterCountry" placeholder="Country" clearable filterable class="filter-select">
+        <el-option v-for="c in COUNTRIES" :key="c" :label="c" :value="c" />
       </el-select>
       <el-select v-model="filterStatus" placeholder="Status" clearable class="filter-select">
         <el-option label="Pending Review" value="pending_review" />
@@ -43,14 +39,21 @@
     <el-table :data="filteredRequests" v-loading="loading" stripe class="table-fill">
       <el-table-column prop="name" label="Name" min-width="150" />
       <el-table-column prop="submitter_username" label="Submitter" width="120" />
-      <el-table-column prop="region" label="Region" width="130">
-        <template #default="scope">
-          {{ formatRegion(scope.row.region) }}
-        </template>
-      </el-table-column>
+      <el-table-column prop="country" label="Country" width="130" show-overflow-tooltip />
       <el-table-column prop="status" label="Status" width="140">
         <template #default="scope">
-          <el-tag :type="getStatusType(scope.row.status)">{{ formatStatus(scope.row.status) }}</el-tag>
+          <el-tooltip
+            v-if="scope.row.status === 'rejected' && scope.row.reject_reason"
+            :content="scope.row.reject_reason"
+            placement="top"
+            :show-after="200"
+          >
+            <el-tag :type="getStatusType(scope.row.status)" class="rejected-tag">
+              {{ formatStatus(scope.row.status) }}
+              <el-icon class="reject-icon"><Warning /></el-icon>
+            </el-tag>
+          </el-tooltip>
+          <el-tag v-else :type="getStatusType(scope.row.status)">{{ formatStatus(scope.row.status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="workload" label="Workload" width="120">
@@ -68,15 +71,20 @@
           {{ new Date(scope.row.submission_date).toLocaleDateString() }}
         </template>
       </el-table-column>
+      <el-table-column prop="estimated_completion_date" label="Est. Completion" width="140">
+        <template #default="scope">
+          {{ scope.row.estimated_completion_date || 'N/A' }}
+        </template>
+      </el-table-column>
       <el-table-column label="Actions" width="220" fixed="right">
         <template #default="scope">
           <template v-if="isAdmin">
             <el-button size="small" type="warning" plain @click="openAssessDialog(scope.row)">Assess</el-button>
           </template>
           <template v-else>
-            <el-button v-if="isOwner(scope.row) && scope.row.status === 'pending_review'" size="small" type="primary" plain @click="handleEdit(scope.row)">Edit</el-button>
+            <el-button v-if="isOwner(scope.row) && (scope.row.status === 'pending_review' || scope.row.status === 'rejected')" size="small" type="primary" plain @click="handleEdit(scope.row)">Edit</el-button>
             <el-button v-if="isOwner(scope.row) && scope.row.status === 'pending_review'" size="small" type="danger" plain @click="handleDelete(scope.row)">Delete</el-button>
-            <el-button v-if="!isOwner(scope.row) || scope.row.status !== 'pending_review'" size="small" type="info" plain @click="handleView(scope.row)">View</el-button>
+            <el-button v-if="!isOwner(scope.row) || (scope.row.status !== 'pending_review' && scope.row.status !== 'rejected')" size="small" type="info" plain @click="handleView(scope.row)">View</el-button>
           </template>
         </template>
       </el-table-column>
@@ -91,13 +99,9 @@
         <el-form-item label="Summary" prop="summary">
           <el-input v-model="createForm.summary" type="textarea" :rows="3" placeholder="Enter summary" />
         </el-form-item>
-        <el-form-item label="Region" prop="region">
-          <el-select v-model="createForm.region" placeholder="Select region" class="field-block">
-            <el-option label="China" value="china" />
-            <el-option label="Europe" value="europe" />
-            <el-option label="South America" value="south_america" />
-            <el-option label="North America" value="north_america" />
-            <el-option label="Asia" value="asia" />
+        <el-form-item label="Country" prop="country">
+          <el-select v-model="createForm.country" placeholder="Select country" class="field-block" filterable>
+            <el-option v-for="c in COUNTRIES" :key="c" :label="c" :value="c" />
           </el-select>
         </el-form-item>
         <el-form-item label="Requirement Type" prop="requirement_type">
@@ -155,6 +159,13 @@
         <el-form-item label="Deadline">
           <el-date-picker v-model="createForm.deadline" type="date" placeholder="Select deadline" class="field-block" value-format="YYYY-MM-DD" />
         </el-form-item>
+        <el-form-item label="Urgency">
+          <el-select v-model="createForm.urgency" placeholder="Select urgency" class="field-block">
+            <el-option label="High" value="high" />
+            <el-option label="Medium" value="medium" />
+            <el-option label="Low" value="low" />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreateDialog = false">Cancel</el-button>
@@ -165,6 +176,7 @@
     <!-- Edit / View Dialog -->
     <el-dialog v-model="showEditDialog" :title="isFormLocked ? 'View Request' : 'Edit Request'" width="600">
       <el-alert v-if="isFormLocked" title="This request is locked and cannot be edited." type="warning" show-icon class="form-alert-bottom" />
+      <el-alert v-if="!isFormLocked && editForm.status === 'rejected' && editForm.reject_reason" :title="'Reject Reason: ' + editForm.reject_reason" type="error" show-icon class="form-alert-bottom" />
       <el-form :model="editForm" :rules="createRules" ref="editFormRef" label-width="160px" :disabled="isFormLocked">
         <el-form-item label="Name" prop="name">
           <el-input v-model="editForm.name" placeholder="Enter requirement name" />
@@ -172,13 +184,9 @@
         <el-form-item label="Summary" prop="summary">
           <el-input v-model="editForm.summary" type="textarea" :rows="3" placeholder="Enter summary" />
         </el-form-item>
-        <el-form-item label="Region" prop="region">
-          <el-select v-model="editForm.region" placeholder="Select region" class="field-block">
-            <el-option label="China" value="china" />
-            <el-option label="Europe" value="europe" />
-            <el-option label="South America" value="south_america" />
-            <el-option label="North America" value="north_america" />
-            <el-option label="Asia" value="asia" />
+        <el-form-item label="Country" prop="country">
+          <el-select v-model="editForm.country" placeholder="Select country" class="field-block" filterable>
+            <el-option v-for="c in COUNTRIES" :key="c" :label="c" :value="c" />
           </el-select>
         </el-form-item>
         <el-form-item label="Requirement Type" prop="requirement_type">
@@ -249,6 +257,13 @@
         <el-form-item label="Deadline">
           <el-date-picker v-model="editForm.deadline" type="date" placeholder="Select deadline" class="field-block" value-format="YYYY-MM-DD" />
         </el-form-item>
+        <el-form-item label="Urgency">
+          <el-select v-model="editForm.urgency" placeholder="Select urgency" class="field-block">
+            <el-option label="High" value="high" />
+            <el-option label="Medium" value="medium" />
+            <el-option label="Low" value="low" />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showEditDialog = false">Cancel</el-button>
@@ -292,6 +307,12 @@
             <el-option label="Rejected" value="rejected" />
           </el-select>
         </el-form-item>
+        <el-form-item v-if="assessForm.status === 'rejected'" label="Reject Reason" required>
+          <el-input v-model="assessForm.reject_reason" type="textarea" :rows="3" placeholder="Please provide a reason for rejection" />
+        </el-form-item>
+        <el-form-item label="Est. Completion">
+          <el-date-picker v-model="assessForm.estimated_completion_date" type="date" placeholder="Select date" class="field-block" value-format="YYYY-MM-DD" clearable />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAssessDialog = false">Cancel</el-button>
@@ -310,6 +331,8 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadProps, UploadUserFile } from 'element-plus'
 import { createRequirementRequest, updateRequirementRequest, assessRequirementRequest } from '../api/requests'
+import { Warning } from '@element-plus/icons-vue'
+import { COUNTRIES } from '../constants/countries'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -336,7 +359,7 @@ const assessForm = ref<any>({})
 // Filter states
 const submitters = ref<{id: number, username: string}[]>([])
 const filterMyRequirements = ref(false)
-const filterRegion = ref('')
+const filterCountry = ref('')
 const filterStatus = ref('')
 const filterSubmitter = ref('')
 
@@ -356,8 +379,8 @@ const filteredRequests = computed(() => {
     if (filterMyRequirements.value) {
       result = result.filter(r => r.submitter_username === authStore.username)
     }
-    if (filterRegion.value) {
-      result = result.filter(r => r.region === filterRegion.value)
+    if (filterCountry.value) {
+      result = result.filter(r => r.country === filterCountry.value)
     }
     if (filterStatus.value) {
       result = result.filter(r => r.status === filterStatus.value)
@@ -372,19 +395,20 @@ const filteredRequests = computed(() => {
 const createForm = ref({
   name: '',
   summary: '',
-  region: '',
+    country: '',
   requirement_type: '',
   impacted_users: '',
   supplementary_materials: [] as string[],
   revenue_impact: '',
-  deadline: ''
+  deadline: '',
+  urgency: 'medium'
 })
 
 const editForm = ref<any>({})
 
 const isFormLocked = computed(() => {
   if (!editForm.value || !editForm.value.status) return true
-  if (editForm.value.status !== 'pending_review') return true
+  if (editForm.value.status !== 'pending_review' && editForm.value.status !== 'rejected') return true
   if (!isOwner(editForm.value)) return true
   return false
 })
@@ -392,7 +416,7 @@ const isFormLocked = computed(() => {
 const createRules = ref<FormRules>({
   name: [{ required: true, message: 'Please enter requirement name', trigger: 'blur' }],
   summary: [{ required: true, message: 'Please enter summary', trigger: 'blur' }],
-  region: [{ required: true, message: 'Please select region', trigger: 'change' }],
+  country: [{ required: true, message: 'Please select country', trigger: 'change' }],
   requirement_type: [{ required: true, message: 'Please select type', trigger: 'change' }]
 })
 
@@ -520,12 +544,13 @@ const openCreateDialog = () => {
   createForm.value = {
     name: '',
     summary: '',
-    region: '',
+    country: '',
     requirement_type: '',
     impacted_users: '',
     supplementary_materials: [],
     revenue_impact: '',
-    deadline: ''
+    deadline: '',
+    urgency: 'medium'
   }
   uploadFileList.value = []
   stagedFiles.value = []
@@ -606,12 +631,21 @@ const submitAssess = async () => {
     ElMessage.warning('Please select both workload and status')
     return
   }
+  if (assessForm.value.status === 'rejected' && !assessForm.value.reject_reason?.trim()) {
+    ElMessage.warning('Please provide a reject reason')
+    return
+  }
   submitting.value = true
   try {
-    await assessRequirementRequest(authStore.token || '', assessForm.value.id, {
+    const payload: any = {
       workload: assessForm.value.workload,
-      status: assessForm.value.status
-    })
+      status: assessForm.value.status,
+      estimated_completion_date: assessForm.value.estimated_completion_date || null
+    }
+    if (assessForm.value.status === 'rejected') {
+      payload.reject_reason = assessForm.value.reject_reason
+    }
+    await assessRequirementRequest(authStore.token || '', assessForm.value.id, payload)
     ElMessage.success('Assessment saved')
     showAssessDialog.value = false
     fetchRequests()
@@ -633,12 +667,13 @@ const submitEdit = async () => {
         const payload = {
           name: editForm.value.name,
           summary: editForm.value.summary,
-          region: editForm.value.region,
+          country: editForm.value.country,
           requirement_type: editForm.value.requirement_type,
           impacted_users: editForm.value.impacted_users,
           supplementary_materials: editForm.value.supplementary_materials,
           revenue_impact: editForm.value.revenue_impact,
           deadline: editForm.value.deadline,
+          urgency: editForm.value.urgency,
           attachments: editStagedFiles.value,
           deleted_attachment_ids: deletedAttachmentIds.value
         }
@@ -657,17 +692,6 @@ const submitEdit = async () => {
 const handleLogout = () => {
   authStore.logout()
   router.push('/login')
-}
-
-const formatRegion = (region: string) => {
-  const map: Record<string, string> = {
-    china: 'China',
-    europe: 'Europe',
-    south_america: 'South America',
-    north_america: 'North America',
-    asia: 'Asia'
-  }
-  return map[region] || region
 }
 
 const formatStatus = (status: string) => {
@@ -771,5 +795,14 @@ onMounted(() => {
 .text-muted {
   color: #909399;
   font-size: 12px;
+}
+
+.rejected-tag {
+  cursor: pointer;
+}
+
+.reject-icon {
+  margin-left: 4px;
+  vertical-align: middle;
 }
 </style>

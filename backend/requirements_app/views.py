@@ -33,6 +33,12 @@ class UserRequirementViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(submitter=self.request.user)
 
+    def perform_update(self, serializer):
+        if self.get_object().status == 'rejected':
+            serializer.save(status='pending_review', reject_reason=None)
+        else:
+            serializer.save()
+
 class AdminRequirementViewSet(viewsets.ModelViewSet):
     """
     ViewSet for admins to view and manage all requirement requests.
