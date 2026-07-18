@@ -4,17 +4,20 @@
       <h2 class="page-title">{{ isAdmin ? 'Admin Dashboard' : 'Requirements List' }}</h2>
       <div>
         <el-button v-if="!isAdmin" type="primary" @click="openCreateDialog">New Request</el-button>
-        <el-button type="danger" @click="handleLogout">Logout</el-button>
       </div>
     </div>
 
     <div v-if="!isAdmin" class="filter-bar">
-      <el-button 
-        :type="filterMyRequirements ? 'primary' : 'default'" 
-        @click="filterMyRequirements = !filterMyRequirements"
-      >
-        My Requirements
-      </el-button>
+      <div class="filter-switch">
+        <el-switch v-model="filterMyRequirements" active-text="My Requirements" />
+      </div>
+      <el-input
+        v-model="filterSearch"
+        placeholder="Search by name..."
+        clearable
+        class="filter-search"
+        :prefix-icon="Search"
+      />
       <el-select v-model="filterCountry" placeholder="Country" clearable filterable class="filter-select">
         <el-option v-for="c in COUNTRIES" :key="c" :label="c" :value="c" />
       </el-select>
@@ -36,7 +39,20 @@
       </el-select>
     </div>
     
-    <el-table :data="filteredRequests" v-loading="loading" stripe class="table-fill">
+    <el-card class="table-card" shadow="never">
+      <el-skeleton :loading="loading" animated :count="5">
+        <template #template>
+          <el-skeleton-item variant="h3" style="width: 100%; height: 40px; margin-bottom: 12px;" />
+        </template>
+        <template #default>
+          <el-table :data="paginatedRequests" stripe border class="table-fill">
+            <template #empty>
+              <div class="empty-state">
+                <el-icon :size="48" color="var(--color-text-muted)"><Document /></el-icon>
+                <p class="empty-text">No requirements found</p>
+                <p class="empty-hint" v-if="!isAdmin">Click "New Request" to create your first requirement.</p>
+              </div>
+            </template>
       <el-table-column prop="name" label="Name" min-width="150" />
       <el-table-column prop="submitter_username" label="Submitter" width="120" />
       <el-table-column prop="country" label="Country" width="130" show-overflow-tooltip />
@@ -61,14 +77,14 @@
           {{ formatWorkload(scope.row.workload) }}
         </template>
       </el-table-column>
-      <el-table-column prop="priority_score" label="Priority Score" width="130">
+      <el-table-column prop="priority_score" label="Priority Score" width="130" sortable :sort-method="sortPriorityScore">
         <template #default="scope">
           {{ scope.row.priority_score !== null ? scope.row.priority_score : 'N/A' }}
         </template>
       </el-table-column>
-      <el-table-column prop="submission_date" label="Submission Date" width="150">
+      <el-table-column prop="submission_date" label="Submission Date" width="150" sortable>
         <template #default="scope">
-          {{ new Date(scope.row.submission_date).toLocaleDateString() }}
+          {{ formatDate(scope.row.submission_date) }}
         </template>
       </el-table-column>
       <el-table-column prop="estimated_completion_date" label="Est. Completion" width="140">
@@ -76,7 +92,7 @@
           {{ scope.row.estimated_completion_date || 'N/A' }}
         </template>
       </el-table-column>
-      <el-table-column label="Actions" width="220" fixed="right">
+      <el-table-column label="Actions" width="180" fixed="right">
         <template #default="scope">
           <template v-if="isAdmin">
             <el-button size="small" type="warning" plain @click="openAssessDialog(scope.row)">Assess</el-button>
@@ -88,85 +104,31 @@
           </template>
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
+      <div v-if="filteredRequests.length > pageSize" class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="currentPage"
+          :page-size="pageSize"
+          :total="filteredRequests.length"
+          layout="total, prev, pager, next"
+          background
+          small
+        />
+      </div>
+        </template>
+      </el-skeleton>
+    </el-card>
 
     <!-- Create Dialog -->
-    <el-dialog v-model="showCreateDialog" title="Create New Request" width="600">
-      <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-width="160px">
-        <el-form-item label="Name" prop="name">
-          <el-input v-model="createForm.name" placeholder="Enter requirement name" />
-        </el-form-item>
-        <el-form-item label="Summary" prop="summary">
-          <el-input v-model="createForm.summary" type="textarea" :rows="3" placeholder="Enter summary" />
-        </el-form-item>
-        <el-form-item label="Country" prop="country">
-          <el-select v-model="createForm.country" placeholder="Select country" class="field-block" filterable>
-            <el-option v-for="c in COUNTRIES" :key="c" :label="c" :value="c" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Requirement Type" prop="requirement_type">
-          <el-select v-model="createForm.requirement_type" placeholder="Select type" class="field-block">
-            <el-option label="Regulatory Compliance" value="regulatory" />
-            <el-option label="Security Vulnerability" value="security" />
-            <el-option label="Revenue Growth" value="revenue" />
-            <el-option label="Cost Reduction" value="cost" />
-            <el-option label="Bug" value="bug" />
-            <el-option label="Feature Optimization" value="optimization" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Impacted Users" prop="impacted_users">
-          <el-select v-model="createForm.impacted_users" placeholder="Select impacted users" class="field-block" clearable>
-            <el-option label="<100" value="<100" />
-            <el-option label="100-500" value="100-500" />
-            <el-option label="500-1000" value="500-1000" />
-            <el-option label=">1000" value=">1000" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Supplementary Materials">
-          <el-select v-model="createForm.supplementary_materials" multiple placeholder="Select materials" class="field-block">
-            <el-option label="User Research" value="user_research" />
-            <el-option label="Data Report" value="data_report" />
-            <el-option label="Competitor Analysis" value="competitor_analysis" />
-            <el-option label="Technical Solution" value="technical_solution" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Attachments">
-          <el-upload
-            v-model:file-list="uploadFileList"
-            :auto-upload="false"
-            :on-change="handleChange"
-            :on-remove="handleRemove"
-            :on-exceed="handleExceed"
-            :limit="3"
-            multiple
-          >
-            <el-button type="primary" plain>Select Files</el-button>
-            <template #tip>
-              <div class="el-upload__tip">
-                Max 3 files, max 5MB per file. Allowed: .pdf, .docx, .xlsx, .png, .jpg
-              </div>
-            </template>
-          </el-upload>
-        </el-form-item>
-        <el-form-item label="Revenue Impact">
-          <el-select v-model="createForm.revenue_impact" placeholder="Select revenue impact" class="field-block" clearable>
-            <el-option label="<50k" value="<50k" />
-            <el-option label="50k-300k" value="50k-300k" />
-            <el-option label="300k-1M" value="300k-1M" />
-            <el-option label=">1M" value=">1M" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Deadline">
-          <el-date-picker v-model="createForm.deadline" type="date" placeholder="Select deadline" class="field-block" value-format="YYYY-MM-DD" />
-        </el-form-item>
-        <el-form-item label="Urgency">
-          <el-select v-model="createForm.urgency" placeholder="Select urgency" class="field-block">
-            <el-option label="High" value="high" />
-            <el-option label="Medium" value="medium" />
-            <el-option label="Low" value="low" />
-          </el-select>
-        </el-form-item>
-      </el-form>
+    <el-dialog v-model="showCreateDialog" title="Create New Request" width="720">
+      <RequirementForm
+        ref="createFormComponent"
+        v-model="createForm"
+        v-model:upload-file-list="uploadFileList"
+        @upload-change="handleCreateUploadChange"
+        @upload-remove="handleCreateUploadRemove"
+        @download="handleDownload"
+      />
       <template #footer>
         <el-button @click="showCreateDialog = false">Cancel</el-button>
         <el-button type="primary" @click="submitCreate" :loading="submitting">Submit</el-button>
@@ -174,97 +136,19 @@
     </el-dialog>
 
     <!-- Edit / View Dialog -->
-    <el-dialog v-model="showEditDialog" :title="isFormLocked ? 'View Request' : 'Edit Request'" width="600">
+    <el-dialog v-model="showEditDialog" :title="isFormLocked ? 'View Request' : 'Edit Request'" width="720">
       <el-alert v-if="isFormLocked" title="This request is locked and cannot be edited." type="warning" show-icon class="form-alert-bottom" />
       <el-alert v-if="!isFormLocked && editForm.status === 'rejected' && editForm.reject_reason" :title="'Reject Reason: ' + editForm.reject_reason" type="error" show-icon class="form-alert-bottom" />
-      <el-form :model="editForm" :rules="createRules" ref="editFormRef" label-width="160px" :disabled="isFormLocked">
-        <el-form-item label="Name" prop="name">
-          <el-input v-model="editForm.name" placeholder="Enter requirement name" />
-        </el-form-item>
-        <el-form-item label="Summary" prop="summary">
-          <el-input v-model="editForm.summary" type="textarea" :rows="3" placeholder="Enter summary" />
-        </el-form-item>
-        <el-form-item label="Country" prop="country">
-          <el-select v-model="editForm.country" placeholder="Select country" class="field-block" filterable>
-            <el-option v-for="c in COUNTRIES" :key="c" :label="c" :value="c" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Requirement Type" prop="requirement_type">
-          <el-select v-model="editForm.requirement_type" placeholder="Select type" class="field-block">
-            <el-option label="Regulatory Compliance" value="regulatory" />
-            <el-option label="Security Vulnerability" value="security" />
-            <el-option label="Revenue Growth" value="revenue" />
-            <el-option label="Cost Reduction" value="cost" />
-            <el-option label="Bug" value="bug" />
-            <el-option label="Feature Optimization" value="optimization" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Impacted Users" prop="impacted_users">
-          <el-select v-model="editForm.impacted_users" placeholder="Select impacted users" class="field-block" clearable>
-            <el-option label="<100" value="<100" />
-            <el-option label="100-500" value="100-500" />
-            <el-option label="500-1000" value="500-1000" />
-            <el-option label=">1000" value=">1000" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Supplementary Materials">
-          <el-select v-model="editForm.supplementary_materials" multiple placeholder="Select materials" class="field-block">
-            <el-option label="User Research" value="user_research" />
-            <el-option label="Data Report" value="data_report" />
-            <el-option label="Competitor Analysis" value="competitor_analysis" />
-            <el-option label="Technical Solution" value="technical_solution" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Attachments">
-          <template v-if="isFormLocked">
-            <div v-if="editForm.attachments_list && editForm.attachments_list.length" class="existing-attachments">
-              <div v-for="att in editForm.attachments_list" :key="att.id" class="attachment-item">
-                <el-link type="primary" @click="handleDownload(att.id, getFileName(att.file))" :underline="false">
-                  {{ getFileName(att.file) }}
-                </el-link>
-              </div>
-            </div>
-            <span v-else class="text-muted">No attachments</span>
-          </template>
-          <template v-else>
-            <el-upload
-              v-model:file-list="editUploadFileList"
-              :auto-upload="false"
-              :on-change="handleEditChange"
-              :on-remove="handleEditRemove"
-              :on-exceed="handleExceed"
-              :on-preview="handleEditPreview"
-              :limit="3"
-              multiple
-            >
-              <el-button type="primary" plain>Select Files</el-button>
-              <template #tip>
-                <div class="el-upload__tip">
-                  Max 3 files, max 5MB per file. Allowed: .pdf, .docx, .xlsx, .png, .jpg
-                </div>
-              </template>
-            </el-upload>
-          </template>
-        </el-form-item>
-        <el-form-item label="Revenue Impact">
-          <el-select v-model="editForm.revenue_impact" placeholder="Select revenue impact" class="field-block" clearable>
-            <el-option label="<50k" value="<50k" />
-            <el-option label="50k-300k" value="50k-300k" />
-            <el-option label="300k-1M" value="300k-1M" />
-            <el-option label=">1M" value=">1M" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Deadline">
-          <el-date-picker v-model="editForm.deadline" type="date" placeholder="Select deadline" class="field-block" value-format="YYYY-MM-DD" />
-        </el-form-item>
-        <el-form-item label="Urgency">
-          <el-select v-model="editForm.urgency" placeholder="Select urgency" class="field-block">
-            <el-option label="High" value="high" />
-            <el-option label="Medium" value="medium" />
-            <el-option label="Low" value="low" />
-          </el-select>
-        </el-form-item>
-      </el-form>
+      <RequirementForm
+        ref="editFormComponent"
+        v-model="editForm"
+        :disabled="isFormLocked"
+        v-model:upload-file-list="editUploadFileList"
+        @upload-change="handleEditUploadChange"
+        @upload-remove="handleEditUploadRemove"
+        @upload-preview="handleEditPreview"
+        @download="handleDownload"
+      />
       <template #footer>
         <el-button @click="showEditDialog = false">Cancel</el-button>
         <el-button v-if="!isFormLocked" type="primary" @click="submitEdit" :loading="submitting">Save Changes</el-button>
@@ -323,19 +207,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
-import { useRouter } from 'vue-router'
-import type { FormInstance, FormRules } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { UploadProps, UploadUserFile } from 'element-plus'
+import type { UploadUserFile } from 'element-plus'
 import { createRequirementRequest, updateRequirementRequest, assessRequirementRequest } from '../api/requests'
-import { Warning } from '@element-plus/icons-vue'
+import { Warning, Search, Document } from '@element-plus/icons-vue'
 import { COUNTRIES } from '../constants/countries'
+import RequirementForm from '../components/RequirementForm.vue'
 
 const authStore = useAuthStore()
-const router = useRouter()
 
 const requests = ref<any[]>([])
 const loading = ref(false)
@@ -343,8 +226,8 @@ const showCreateDialog = ref(false)
 const showEditDialog = ref(false)
 const showAssessDialog = ref(false)
 const submitting = ref(false)
-const createFormRef = ref<FormInstance>()
-const editFormRef = ref<FormInstance>()
+const createFormComponent = ref()
+const editFormComponent = ref()
 const editingId = ref<number | null>(null)
 
 const uploadFileList = ref<UploadUserFile[]>([])
@@ -359,9 +242,14 @@ const assessForm = ref<any>({})
 // Filter states
 const submitters = ref<{id: number, username: string}[]>([])
 const filterMyRequirements = ref(false)
+const filterSearch = ref('')
 const filterCountry = ref('')
 const filterStatus = ref('')
 const filterSubmitter = ref('')
+
+// Pagination
+const currentPage = ref(1)
+const pageSize = 20
 
 const isAdmin = computed(() => {
   return authStore.role === 'admin'
@@ -379,6 +267,10 @@ const filteredRequests = computed(() => {
     if (filterMyRequirements.value) {
       result = result.filter(r => r.submitter_username === authStore.username)
     }
+    if (filterSearch.value) {
+      const query = filterSearch.value.toLowerCase()
+      result = result.filter(r => r.name.toLowerCase().includes(query))
+    }
     if (filterCountry.value) {
       result = result.filter(r => r.country === filterCountry.value)
     }
@@ -390,6 +282,11 @@ const filteredRequests = computed(() => {
     }
   }
   return result
+})
+
+const paginatedRequests = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredRequests.value.slice(start, start + pageSize)
 })
 
 const createForm = ref({
@@ -413,58 +310,23 @@ const isFormLocked = computed(() => {
   return false
 })
 
-const createRules = ref<FormRules>({
-  name: [{ required: true, message: 'Please enter requirement name', trigger: 'blur' }],
-  summary: [{ required: true, message: 'Please enter summary', trigger: 'blur' }],
-  country: [{ required: true, message: 'Please select country', trigger: 'change' }],
-  requirement_type: [{ required: true, message: 'Please select type', trigger: 'change' }]
-})
-
-const validateUpload = (file: UploadUserFile, uploadFiles: UploadUserFile[], fileListRef: Ref<UploadUserFile[]>, stagedFilesRef: Ref<File[]>) => {
-  const allowedExtensions = ['.pdf', '.docx', '.xlsx', '.png', '.jpg']
-  const fileName = file.name.toLowerCase()
-  const isValidExt = allowedExtensions.some(ext => fileName.endsWith(ext))
-  
-  if (!isValidExt) {
-    ElMessage.error('Only .pdf, .docx, .xlsx, .png, .jpg files are allowed.')
-    fileListRef.value = fileListRef.value.filter(f => f.uid !== file.uid)
-    stagedFilesRef.value = fileListRef.value.filter(f => !(f as any).id).map(f => f.raw as File).filter(Boolean)
-    return
-  }
-  
-  const fileSizeMB = (file.raw?.size || 0) / 1024 / 1024
-  if (fileSizeMB > 5) {
-    ElMessage.error(`File "${file.name}" exceeds the 5MB limit.`)
-    fileListRef.value = fileListRef.value.filter(f => f.uid !== file.uid)
-    stagedFilesRef.value = fileListRef.value.filter(f => !(f as any).id).map(f => f.raw as File).filter(Boolean)
-    return
-  }
-  
-  stagedFilesRef.value = uploadFiles.filter(f => !(f as any).id).map(f => f.raw as File).filter(Boolean)
+const handleCreateUploadChange = (_file: UploadUserFile, uploadFiles: UploadUserFile[]) => {
+  stagedFiles.value = uploadFiles.filter(f => !(f as any).id).map(f => f.raw as File).filter(Boolean)
 }
 
-const handleChange: UploadProps['onChange'] = (file, uploadFiles) => {
-  validateUpload(file, uploadFiles, uploadFileList, stagedFiles)
+const handleCreateUploadRemove = (_file: UploadUserFile, uploadFiles: UploadUserFile[]) => {
+  stagedFiles.value = uploadFiles.filter(f => !(f as any).id).map(f => f.raw as File).filter(Boolean)
 }
 
-const handleEditChange: UploadProps['onChange'] = (file, uploadFiles) => {
-  validateUpload(file, uploadFiles, editUploadFileList, editStagedFiles)
+const handleEditUploadChange = (_file: UploadUserFile, uploadFiles: UploadUserFile[]) => {
+  editStagedFiles.value = uploadFiles.filter(f => !(f as any).id).map(f => f.raw as File).filter(Boolean)
 }
 
-const handleRemove: UploadProps['onRemove'] = (_file, uploadFiles) => {
-  stagedFiles.value = uploadFiles.map(f => f.raw as File).filter(Boolean)
-}
-
-const handleEditRemove: UploadProps['onRemove'] = (file, uploadFiles) => {
-  // If the removed file is an existing file (has an ID), track it for backend deletion
+const handleEditUploadRemove = (file: UploadUserFile, uploadFiles: UploadUserFile[]) => {
   if ((file as any).id) {
     deletedAttachmentIds.value.push((file as any).id)
   }
   editStagedFiles.value = uploadFiles.filter(f => !(f as any).id).map(f => f.raw as File).filter(Boolean)
-}
-
-const handleExceed: UploadProps['onExceed'] = () => {
-  ElMessage.error('Maximum 3 files allowed.')
 }
 
 const getFileName = (filePath: string) => {
@@ -558,8 +420,9 @@ const openCreateDialog = () => {
 }
 
 const submitCreate = async () => {
-  if (!createFormRef.value) return
-  await createFormRef.value.validate(async (valid) => {
+  const formRef = createFormComponent.value?.formRef as FormInstance | undefined
+  if (!formRef) return
+  await formRef.validate(async (valid) => {
     if (valid) {
       submitting.value = true
       try {
@@ -658,9 +521,10 @@ const submitAssess = async () => {
 }
 
 const submitEdit = async () => {
-  if (!editFormRef.value || editingId.value === null) return
+  const formRef = editFormComponent.value?.formRef as FormInstance | undefined
+  if (!formRef || editingId.value === null) return
   const currentEditingId = editingId.value
-  await editFormRef.value.validate(async (valid) => {
+  await formRef.validate(async (valid) => {
     if (valid) {
       submitting.value = true
       try {
@@ -689,11 +553,6 @@ const submitEdit = async () => {
   })
 }
 
-const handleLogout = () => {
-  authStore.logout()
-  router.push('/login')
-}
-
 const formatStatus = (status: string) => {
   const map: Record<string, string> = {
     pending_review: 'Pending Review',
@@ -711,7 +570,7 @@ const getStatusType = (status: string) => {
     pending_review: 'info',
     under_review: 'warning',
     confirmed: 'primary',
-    in_development: '',
+    in_development: 'warning',
     completed: 'success',
     rejected: 'danger'
   }
@@ -726,6 +585,17 @@ const formatWorkload = (workload: string) => {
     large: 'Large'
   }
   return map[workload] || workload
+}
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return 'N/A'
+  return new Date(dateStr).toLocaleDateString('en-CA')
+}
+
+const sortPriorityScore = (a: any, b: any) => {
+  const scoreA = a.priority_score ?? -1
+  const scoreB = b.priority_score ?? -1
+  return scoreA - scoreB
 }
 
 onMounted(() => {
@@ -744,7 +614,7 @@ onMounted(() => {
 }
 
 .form-alert-bottom {
-  margin-bottom: var(--space-header);
+  margin-bottom: var(--space-3);
 }
 
 .user-dashboard {
@@ -771,20 +641,56 @@ onMounted(() => {
 
 .filter-bar {
   display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
+}
+
+.filter-switch {
+  flex-shrink: 0;
+}
+
+.filter-search {
+  width: 220px;
 }
 
 .filter-select {
   width: 180px;
 }
 
+.table-card {
+  border-radius: var(--radius-md);
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
+
+.empty-state {
+  padding: var(--space-6) 0;
+  text-align: center;
+}
+
+.empty-text {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: 15px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.empty-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
 .existing-attachments {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .attachment-item {
@@ -793,7 +699,7 @@ onMounted(() => {
 }
 
 .text-muted {
-  color: #909399;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
