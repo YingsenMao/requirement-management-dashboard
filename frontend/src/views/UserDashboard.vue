@@ -485,11 +485,8 @@ const fetchRequests = async () => {
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${authStore.token}` }
     })
-    const data = response.data
+    const data = response.data.results || response.data
     
-    // Frontend sort guarantee: 
-    // 1. Completed status at the very bottom
-    // 2. Priority Score descending, N/A (null) at the bottom
     data.sort((a: any, b: any) => {
       if (a.status === 'completed' && b.status !== 'completed') return 1
       if (a.status !== 'completed' && b.status === 'completed') return -1

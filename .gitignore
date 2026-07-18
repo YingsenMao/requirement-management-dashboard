@@ -1,4 +1,5 @@
 .aider*
+.opencode/
 
 # Docker data directories (if using local bind mounts for backups)
 /data/

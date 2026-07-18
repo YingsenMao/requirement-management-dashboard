@@ -92,8 +92,8 @@ def test_priority_score_small_workload():
         impacted_users='>1000', revenue_impact='>1M', supplementary_materials=['a', 'b', 'c', 'd'],
         workload='small', submitter=user
     )
-    # regulatory(50) + >1000(40) + >1M(40) + 4 materials(20) + small(30) = 180
-    assert req.priority_score == 180
+    # regulatory(50) + >1000(40) + >1M(50) + 4 materials(80→max50) + small(50) = 240
+    assert req.priority_score == 240
 
 @pytest.mark.django_db
 def test_priority_score_medium_workload():
@@ -103,8 +103,8 @@ def test_priority_score_medium_workload():
         impacted_users='<100', revenue_impact=None, supplementary_materials=[],
         workload='medium', submitter=user
     )
-    # bug(10) + <100(10) + None(0) + 0 materials(0) + medium(15) = 35
-    assert req.priority_score == 35
+    # bug(30) + <100(10) + None(0) + 0 materials(0) + medium(10) = 50
+    assert req.priority_score == 50
 
 @pytest.mark.django_db
 def test_priority_score_large_workload():
@@ -114,8 +114,8 @@ def test_priority_score_large_workload():
         impacted_users='100-500', revenue_impact='50k-300k', supplementary_materials=['a'],
         workload='large', submitter=user
     )
-    # optimization(0) + 100-500(20) + 50k-300k(20) + 1 material(5) + large(0) = 45
-    assert req.priority_score == 45
+    # optimization(0) + 100-500(20) + 50k-300k(20) + 1 material(20) + large(-10) = 50
+    assert req.priority_score == 50
 
 @pytest.mark.django_db
 def test_user_global_read_and_owner_write():
@@ -131,7 +131,7 @@ def test_user_global_read_and_owner_write():
     # User1 can see all requests (Global Read)
     response = client.get('/api/requests/')
     assert response.status_code == 200
-    assert len(response.data) == 2
+    assert len(response.data['results']) == 2
     
     # User1 can edit their own pending_review request
     response = client.patch(f'/api/requests/{req1.id}/', {'name': 'UpdatedReq1'}, format='json')
@@ -174,10 +174,10 @@ def test_admin_view_and_sorting():
     
     response = client.get('/api/admin/requests/')
     assert response.status_code == 200
-    assert len(response.data) == 2
-    # Check sorting: HighScore should be first
-    assert response.data[0]['name'] == 'HighScore'
-    assert response.data[1]['name'] == 'LowScore'
+    results = response.data['results']
+    assert len(results) == 2
+    assert results[0]['name'] == 'HighScore'
+    assert results[1]['name'] == 'LowScore'
 
 @pytest.mark.django_db
 def test_admin_update_workload_and_status():

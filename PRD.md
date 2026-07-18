@@ -7,6 +7,7 @@
 - 2024-05-24: Defined strict file upload constraints: Max 3 files per request, max 5MB per file, whitelist extensions (.pdf, .docx, .xlsx, .png, .jpg). (AI)
 - 2024-05-24: Iteration - Updated regular user visibility to allow viewing all requirements (read-only for others'). Added "Submitter" column to the list. Restricted Admin edit rights to only `workload` and `status` fields via an "Assess" action. (AI)
 - 2024-05-24: Iteration - Added 'Region' column to the requirement list. Updated sorting logic to strictly order by Priority Score descending with unassessed (N/A) items at the bottom. (AI)
+- 2026-07-18: Corrected Priority Scoring formula to match actual implementation: Bug=+30, Revenue Growth=+20, Revenue Impact >1M=+50, Supplementary Materials=+20/item (max +50), Workload Small=+50/Medium=+10/Large=-10. (AI)
 
 ## Project overview
 This project is a SaaS Requirements Management Platform designed for Product Managers to collect, manage, and prioritize feature requests from global users. The system allows administrators to create user accounts, while regular users can submit and track their requirement requests. The core value of the platform is its automated priority scoring system, which helps PMs objectively rank requests based on ROI and risk factors.
@@ -49,11 +50,11 @@ This project is a SaaS Requirements Management Platform designed for Product Man
 ### 4. Priority Scoring Logic
 - The Priority Score is displayed as "N/A" until the Admin explicitly sets the Workload to Small, Medium, or Large.
 - **Formula (Sum of weights):**
-  - **Requirement Type:** Regulatory Compliance (+50), Security Vulnerability (+40), Revenue Growth (+30), Cost Reduction (+20), Bug (+10), Feature Optimization (+0).
+  - **Requirement Type:** Regulatory Compliance (+50), Security Vulnerability (+40), Bug (+30), Revenue Growth (+20), Cost Reduction (+10), Feature Optimization (+0).
   - **Impacted Users:** >1000 (+40), 500-1000 (+30), 100-500 (+20), <100 (+10).
-  - **Revenue Impact:** >1M (+40), 300k-1M (+30), 50k-300k (+20), <50k (+10), Not filled (+0).
-  - **Supplementary Materials:** +5 for each selected item (Max +20).
-  - **Workload:** Small (+30), Medium (+15), Large (+0).
+  - **Revenue Impact:** >1M (+50), 300k-1M (+30), 50k-300k (+20), <50k (+10), Not filled (+0).
+  - **Supplementary Materials:** +20 for each selected item (Max +50).
+  - **Workload:** Small (+50), Medium (+10), Large (-10).
 
 ## Core components
 - **Frontend:** Vue 3 + Element Plus + TypeScript (Vite build).

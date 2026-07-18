@@ -22,9 +22,7 @@ class UserRequirementViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        # Users can view all requests (Global Read), but permissions will restrict editing
-        # Sort by: 1. Completed status at the bottom, 2. Priority score descending (nulls last), 3. Submission date descending
-        return RequirementRequest.objects.annotate(
+        return RequirementRequest.objects.select_related('submitter').prefetch_related('attachments').annotate(
             is_completed=Case(
                 When(status='completed', then=Value(1)),
                 default=Value(0),
@@ -33,7 +31,6 @@ class UserRequirementViewSet(viewsets.ModelViewSet):
         ).order_by('is_completed', F('priority_score').desc(nulls_last=True), '-submission_date')
 
     def perform_create(self, serializer):
-        # Automatically assign the current user as the submitter
         serializer.save(submitter=self.request.user)
 
 class AdminRequirementViewSet(viewsets.ModelViewSet):
@@ -45,8 +42,7 @@ class AdminRequirementViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        # Admins see all requests, sorted with completed at the bottom, then by priority score descending (nulls last)
-        return RequirementRequest.objects.annotate(
+        return RequirementRequest.objects.select_related('submitter').prefetch_related('attachments').annotate(
             is_completed=Case(
                 When(status='completed', then=Value(1)),
                 default=Value(0),
@@ -98,12 +94,11 @@ class AttachmentDownloadView(APIView):
         if not content_type:
             content_type = 'application/octet-stream'
 
-        # FileResponse handles streaming and sets appropriate headers
-        response = FileResponse(open(file_path, 'rb'), content_type=content_type)
-        
-        # Set Content-Disposition to trigger download in browser
+        file_handle = open(file_path, 'rb')
+        response = FileResponse(file_handle, content_type=content_type)
+
         file_name = os.path.basename(attachment.file.name)
         encoded_name = quote(file_name)
         response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_name}"
-        
+
         return response

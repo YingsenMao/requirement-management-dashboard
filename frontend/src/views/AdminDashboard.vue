@@ -146,7 +146,7 @@ const fetchRequests = async () => {
     const response = await axios.get('/api/admin/requests/', {
       headers: { Authorization: `Bearer ${authStore.token}` }
     })
-    requests.value = response.data
+    requests.value = response.data.results || response.data
   } catch (error) {
     console.error('Failed to fetch requests', error)
   } finally {
