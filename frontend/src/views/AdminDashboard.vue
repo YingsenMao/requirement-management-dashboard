@@ -250,7 +250,7 @@ const filterSubmitter = ref('')
 
 // Pagination
 const currentPage = ref(1)
-const pageSize = 20
+const pageSize = 10
 
 const filteredRequests = computed(() => {
   let result = requests.value
