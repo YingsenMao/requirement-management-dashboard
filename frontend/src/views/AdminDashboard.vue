@@ -150,7 +150,7 @@
           <el-descriptions-item label="Urgency">
             <el-tag :type="getUrgencyType(selectedRequest.urgency)" effect="light" round>{{ formatUrgency(selectedRequest.urgency) }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="Summary" :span="2" class="summary-cell">{{ selectedRequest.summary }}</el-descriptions-item>
+          <el-descriptions-item label="Description" :span="2" class="summary-cell"><div v-html="selectedRequest.summary"></div></el-descriptions-item>
           <el-descriptions-item label="Supplementary Materials" :span="2">
             <div v-if="selectedRequest.supplementary_materials && selectedRequest.supplementary_materials.length" class="materials-list">
               <el-tag v-for="(mat, idx) in selectedRequest.supplementary_materials" :key="idx" type="info" effect="plain" class="material-tag">{{ mat }}</el-tag>

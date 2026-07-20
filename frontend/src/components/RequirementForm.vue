@@ -20,16 +20,26 @@
           show-word-limit
         />
       </el-form-item>
-      <el-form-item label="Summary" prop="summary">
-        <el-input
-          :model-value="modelValue.summary"
-          @update:model-value="updateField('summary', $event)"
-          type="textarea"
-          :rows="4"
-          placeholder="Describe the requirement in detail"
-          maxlength="2000"
-          show-word-limit
-        />
+      <el-form-item label="Description" prop="summary">
+        <div class="rich-editor-wrapper" :class="{ 'is-disabled': disabled }">
+          <div v-if="!disabled" class="rich-editor-toolbar">
+            <button type="button" :class="{ 'is-active': editor?.isActive('bold') }" @click="editor?.chain().focus().toggleBold().run()">B</button>
+            <button type="button" :class="{ 'is-active': editor?.isActive('italic') }" @click="editor?.chain().focus().toggleItalic().run()"><em>I</em></button>
+            <button type="button" :class="{ 'is-active': editor?.isActive('underline') }" @click="editor?.chain().focus().toggleUnderline().run()"><u>U</u></button>
+            <span class="toolbar-divider"></span>
+            <button type="button" :class="{ 'is-active': editor?.isActive('heading', { level: 1 }) }" @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()">H1</button>
+            <button type="button" :class="{ 'is-active': editor?.isActive('heading', { level: 2 }) }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
+            <span class="toolbar-divider"></span>
+            <button type="button" :class="{ 'is-active': editor?.isActive('bulletList') }" @click="editor?.chain().focus().toggleBulletList().run()">&#8226; List</button>
+            <button type="button" :class="{ 'is-active': editor?.isActive('orderedList') }" @click="editor?.chain().focus().toggleOrderedList().run()">1. List</button>
+            <span class="toolbar-divider"></span>
+            <button type="button" :class="{ 'is-active': editor?.isActive({ textAlign: 'left' }) }" @click="editor?.chain().focus().setTextAlign('left').run()">&#8676;</button>
+            <button type="button" :class="{ 'is-active': editor?.isActive({ textAlign: 'center' }) }" @click="editor?.chain().focus().setTextAlign('center').run()">&#8596;</button>
+            <button type="button" :class="{ 'is-active': editor?.isActive({ textAlign: 'right' }) }" @click="editor?.chain().focus().setTextAlign('right').run()">&#8677;</button>
+          </div>
+          <EditorContent v-if="!disabled" :editor="editor" class="rich-editor-content" />
+          <div v-else class="rich-editor-preview" v-html="modelValue.summary || '<span class=\'text-muted\'>No description</span>'"></div>
+        </div>
       </el-form-item>
       <el-row :gutter="16">
         <el-col :span="12">
@@ -194,10 +204,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import type { FormInstance, FormRules, UploadProps, UploadUserFile } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { COUNTRIES } from '../constants/countries'
+import { useEditor, EditorContent } from '@tiptap/vue-3'
+import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
+import TextAlign from '@tiptap/extension-text-align'
+import Placeholder from '@tiptap/extension-placeholder'
 
 const props = defineProps<{
   modelValue: any
@@ -206,6 +221,37 @@ const props = defineProps<{
 }>()
 
 const internalFormRef = ref<FormInstance>()
+
+const editor = useEditor({
+  extensions: [
+    StarterKit,
+    Underline,
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    Placeholder.configure({ placeholder: 'Describe the requirement in detail...' }),
+  ],
+  content: props.modelValue.summary || '',
+  onUpdate: ({ editor: e }) => {
+    updateField('summary', e.getHTML())
+  },
+})
+
+watch(() => props.modelValue.summary, (newVal) => {
+  if (!editor.value) return
+  const currentHTML = editor.value.getHTML()
+  if (newVal !== currentHTML) {
+    editor.value.commands.setContent(newVal || '', { emitUpdate: false })
+  }
+})
+
+watch(() => props.disabled, (val) => {
+  if (editor.value) {
+    editor.value.setEditable(!val)
+  }
+})
+
+onBeforeUnmount(() => {
+  editor.value?.destroy()
+})
 
 defineExpose({
   formRef: internalFormRef
@@ -223,7 +269,7 @@ const emit = defineEmits<{
 
 const rules: FormRules = {
   name: [{ required: true, message: 'Please enter requirement name', trigger: 'blur' }],
-  summary: [{ required: true, message: 'Please enter summary', trigger: 'blur' }],
+  summary: [{ required: true, message: 'Please enter description', trigger: 'blur' }],
   country: [{ required: true, message: 'Please select country', trigger: 'change' }],
   requirement_type: [{ required: true, message: 'Please select type', trigger: 'change' }]
 }
@@ -324,5 +370,123 @@ const onUploadPreview = (file: UploadUserFile) => {
 .text-muted {
   color: var(--color-text-muted);
   font-size: 13px;
+}
+
+.rich-editor-wrapper {
+  width: 100%;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-card);
+}
+
+.rich-editor-wrapper.is-disabled {
+  background: var(--color-surface-form);
+}
+
+.rich-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border-default);
+  background: var(--color-surface-form);
+  flex-wrap: wrap;
+}
+
+.rich-editor-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rich-editor-toolbar button:hover {
+  background: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.rich-editor-toolbar button.is-active {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border-default);
+  margin: 0 4px;
+}
+
+.rich-editor-content {
+  min-height: 150px;
+}
+
+.rich-editor-content :deep(.tiptap) {
+  outline: none;
+  padding: 12px;
+  min-height: 150px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.rich-editor-content :deep(.tiptap p.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-text-muted);
+  pointer-events: none;
+  height: 0;
+}
+
+.rich-editor-content :deep(.tiptap h1) {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+.rich-editor-content :deep(.tiptap h2) {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 6px 0;
+}
+
+.rich-editor-content :deep(.tiptap ul),
+.rich-editor-content :deep(.tiptap ol) {
+  padding-left: 24px;
+}
+
+.rich-editor-preview {
+  padding: 12px;
+  min-height: 80px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.rich-editor-preview :deep(h1) {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+.rich-editor-preview :deep(h2) {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 6px 0;
+}
+
+.rich-editor-preview :deep(ul),
+.rich-editor-preview :deep(ol) {
+  padding-left: 24px;
 }
 </style>
