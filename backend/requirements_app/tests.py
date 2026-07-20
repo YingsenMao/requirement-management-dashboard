@@ -131,7 +131,7 @@ def test_user_global_read_and_owner_write():
     # User1 can see all requests (Global Read)
     response = client.get('/api/requests/')
     assert response.status_code == 200
-    assert len(response.data['results']) == 2
+    assert len(response.data) == 2
     
     # User1 can edit their own pending_review request
     response = client.patch(f'/api/requests/{req1.id}/', {'name': 'UpdatedReq1'}, format='json')
@@ -174,7 +174,7 @@ def test_admin_view_and_sorting():
     
     response = client.get('/api/admin/requests/')
     assert response.status_code == 200
-    results = response.data['results']
+    results = response.data
     assert len(results) == 2
     assert results[0]['name'] == 'HighScore'
     assert results[1]['name'] == 'LowScore'

@@ -20,6 +20,7 @@ class UserRequirementViewSet(viewsets.ModelViewSet):
     serializer_class = RequirementRequestSerializer
     permission_classes = [IsAuthenticated, IsOwnerAndPendingReview]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
 
     def get_queryset(self):
         return RequirementRequest.objects.select_related('submitter').prefetch_related('attachments').annotate(
@@ -46,6 +47,7 @@ class AdminRequirementViewSet(viewsets.ModelViewSet):
     serializer_class = AdminRequirementSerializer
     permission_classes = [IsAdminUser]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
 
     def get_queryset(self):
         return RequirementRequest.objects.select_related('submitter').prefetch_related('attachments').annotate(

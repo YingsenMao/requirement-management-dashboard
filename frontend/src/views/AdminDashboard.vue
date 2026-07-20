@@ -82,7 +82,7 @@
           <el-skeleton-item variant="h3" style="width: 100%; height: 40px; margin-bottom: 12px;" />
         </template>
         <template #default>
-          <el-table :data="paginatedRequests" stripe border class="data-table table-fill">
+          <el-table :data="paginatedRequests" stripe border class="data-table table-fill" @sort-change="handleSortChange">
             <template #empty>
               <div class="empty-state">
                 <el-icon :size="48" color="var(--color-text-muted)"><Document /></el-icon>
@@ -101,17 +101,17 @@
             <el-tag :type="getWorkloadType(scope.row.workload)" effect="plain" round>{{ formatWorkload(scope.row.workload) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="priority_score" label="Priority Score" width="140" align="center" sortable :sort-method="sortPriorityScore">
+        <el-table-column prop="priority_score" label="Priority Score" width="140" align="center" sortable="custom">
           <template #default="scope">
             <span class="priority-score">{{ scope.row.priority_score !== null ? scope.row.priority_score : 'N/A' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="submission_date" label="Submission Date" width="160" sortable>
+        <el-table-column prop="submission_date" label="Submission Date" width="160" sortable="custom">
           <template #default="scope">
             {{ formatDate(scope.row.submission_date) }}
           </template>
         </el-table-column>
-        <el-table-column prop="estimated_completion_date" label="Est. Completion" width="150">
+        <el-table-column prop="estimated_completion_date" label="Est. Completion" width="150" sortable="custom">
           <template #default="scope">
             {{ scope.row.estimated_completion_date || 'N/A' }}
           </template>
@@ -252,6 +252,10 @@ const filterSubmitter = ref('')
 const currentPage = ref(1)
 const pageSize = 10
 
+// Sorting
+const sortProp = ref<string | null>(null)
+const sortOrder = ref<string | null>(null)
+
 const filteredRequests = computed(() => {
   let result = requests.value
   if (filterSearch.value) {
@@ -270,9 +274,24 @@ const filteredRequests = computed(() => {
   return result
 })
 
+const sortedRequests = computed(() => {
+  if (!sortProp.value || !sortOrder.value) return filteredRequests.value
+  const prop = sortProp.value
+  const asc = sortOrder.value === 'ascending' ? 1 : -1
+  return [...filteredRequests.value].sort((a: any, b: any) => {
+    const va = a[prop]
+    const vb = b[prop]
+    if (va === null || va === undefined) return 1
+    if (vb === null || vb === undefined) return -1
+    if (va < vb) return -1 * asc
+    if (va > vb) return 1 * asc
+    return 0
+  })
+})
+
 const paginatedRequests = computed(() => {
   const start = (currentPage.value - 1) * pageSize
-  return filteredRequests.value.slice(start, start + pageSize)
+  return sortedRequests.value.slice(start, start + pageSize)
 })
 
 const countByStatus = (status: string) => {
@@ -285,7 +304,7 @@ const fetchRequests = async () => {
     const response = await axios.get('/api/admin/requests/', {
       headers: { Authorization: `Bearer ${authStore.token}` }
     })
-    requests.value = response.data.results || response.data
+    requests.value = response.data
   } catch (error) {
     console.error('Failed to fetch requests', error)
   } finally {
@@ -411,10 +430,10 @@ const getWorkloadType = (workload: string) => {
   return map[workload] || 'info'
 }
 
-const sortPriorityScore = (a: any, b: any) => {
-  const scoreA = a.priority_score ?? -1
-  const scoreB = b.priority_score ?? -1
-  return scoreA - scoreB
+const handleSortChange = ({ prop, order }: { prop: string | null; order: string | null }) => {
+  sortProp.value = prop
+  sortOrder.value = order
+  currentPage.value = 1
 }
 
 const formatType = (type: string) => {

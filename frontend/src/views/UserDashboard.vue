@@ -45,7 +45,7 @@
           <el-skeleton-item variant="h3" style="width: 100%; height: 40px; margin-bottom: 12px;" />
         </template>
         <template #default>
-          <el-table :data="paginatedRequests" stripe border class="table-fill">
+          <el-table :data="paginatedRequests" stripe border class="table-fill" @sort-change="handleSortChange">
             <template #empty>
               <div class="empty-state">
                 <el-icon :size="48" color="var(--color-text-muted)"><Document /></el-icon>
@@ -77,17 +77,17 @@
           {{ formatWorkload(scope.row.workload) }}
         </template>
       </el-table-column>
-      <el-table-column prop="priority_score" label="Priority Score" width="130" sortable :sort-method="sortPriorityScore">
+      <el-table-column prop="priority_score" label="Priority Score" width="130" sortable="custom">
         <template #default="scope">
           {{ scope.row.priority_score !== null ? scope.row.priority_score : 'N/A' }}
         </template>
       </el-table-column>
-      <el-table-column prop="submission_date" label="Submission Date" width="150" sortable>
+      <el-table-column prop="submission_date" label="Submission Date" width="150" sortable="custom">
         <template #default="scope">
           {{ formatDate(scope.row.submission_date) }}
         </template>
       </el-table-column>
-      <el-table-column prop="estimated_completion_date" label="Est. Completion" width="140">
+      <el-table-column prop="estimated_completion_date" label="Est. Completion" width="140" sortable="custom">
         <template #default="scope">
           {{ scope.row.estimated_completion_date || 'N/A' }}
         </template>
@@ -251,6 +251,10 @@ const filterSubmitter = ref('')
 const currentPage = ref(1)
 const pageSize = 10
 
+// Sorting
+const sortProp = ref<string | null>(null)
+const sortOrder = ref<string | null>(null)
+
 const isAdmin = computed(() => {
   return authStore.role === 'admin'
 })
@@ -284,9 +288,24 @@ const filteredRequests = computed(() => {
   return result
 })
 
+const sortedRequests = computed(() => {
+  if (!sortProp.value || !sortOrder.value) return filteredRequests.value
+  const prop = sortProp.value
+  const asc = sortOrder.value === 'ascending' ? 1 : -1
+  return [...filteredRequests.value].sort((a: any, b: any) => {
+    const va = a[prop]
+    const vb = b[prop]
+    if (va === null || va === undefined) return 1
+    if (vb === null || vb === undefined) return -1
+    if (va < vb) return -1 * asc
+    if (va > vb) return 1 * asc
+    return 0
+  })
+})
+
 const paginatedRequests = computed(() => {
   const start = (currentPage.value - 1) * pageSize
-  return filteredRequests.value.slice(start, start + pageSize)
+  return sortedRequests.value.slice(start, start + pageSize)
 })
 
 const createForm = ref({
@@ -371,7 +390,7 @@ const fetchRequests = async () => {
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${authStore.token}` }
     })
-    const data = response.data.results || response.data
+    const data = response.data
     
     data.sort((a: any, b: any) => {
       if (a.status === 'completed' && b.status !== 'completed') return 1
@@ -592,10 +611,10 @@ const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString('en-CA')
 }
 
-const sortPriorityScore = (a: any, b: any) => {
-  const scoreA = a.priority_score ?? -1
-  const scoreB = b.priority_score ?? -1
-  return scoreA - scoreB
+const handleSortChange = ({ prop, order }: { prop: string | null; order: string | null }) => {
+  sortProp.value = prop
+  sortOrder.value = order
+  currentPage.value = 1
 }
 
 onMounted(() => {
