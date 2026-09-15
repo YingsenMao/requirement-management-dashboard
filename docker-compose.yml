@@ -1,7 +1,7 @@
 services:
   # MySQL Database
   db:
-    image: mysql:8.0
+    image: docker.m.daocloud.io/library/mysql:8.0
     container_name: mgt_db
     restart: always
     environment:
