@@ -11,6 +11,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Add custom claims to the token payload
         token['role'] = user.role
         token['username'] = user.username
+        token['department'] = user.department
         return token
 
 class AttachmentSerializer(serializers.ModelSerializer):
@@ -21,6 +22,11 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
 class RequirementRequestSerializer(serializers.ModelSerializer):
     submitter_username = serializers.CharField(source='submitter.username', read_only=True)
+    owning_department = serializers.ChoiceField(
+        choices=RequirementRequest.DEPARTMENT_CHOICES,
+        required=True,
+        allow_blank=False
+    )
     deadline = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
     supplementary_materials = serializers.JSONField(required=False, allow_null=True, default=list)
     revenue_impact = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
@@ -48,7 +54,7 @@ class RequirementRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = RequirementRequest
         fields = [
-            'id', 'name', 'summary', 'country', 'requirement_type', 
+            'id', 'name', 'summary', 'country', 'owning_department', 'requirement_type', 
             'impacted_users', 'supplementary_materials', 'revenue_impact', 
             'deadline', 'submission_date', 'workload', 'status', 
             'priority_score', 'submitter', 'submitter_username',
@@ -140,14 +146,14 @@ class AdminRequirementSerializer(serializers.ModelSerializer):
     class Meta:
         model = RequirementRequest
         fields = [
-            'id', 'name', 'summary', 'country', 'requirement_type', 
+            'id', 'name', 'summary', 'country', 'owning_department', 'requirement_type', 
             'impacted_users', 'supplementary_materials', 'revenue_impact', 
             'deadline', 'submission_date', 'workload', 'status', 
             'priority_score', 'submitter', 'submitter_username', 'attachments_list',
             'reject_reason', 'estimated_completion_date', 'urgency'
         ]
         read_only_fields = [
-            'id', 'name', 'summary', 'country', 'requirement_type', 
+            'id', 'name', 'summary', 'country', 'owning_department', 'requirement_type', 
             'impacted_users', 'supplementary_materials', 'revenue_impact', 
             'deadline', 'submission_date', 'priority_score', 'submitter', 
             'submitter_username', 'attachments_list', 'urgency'
@@ -161,3 +167,50 @@ class AdminRequirementSerializer(serializers.ModelSerializer):
         if status != 'rejected':
             data['reject_reason'] = None
         return data
+
+
+class UserCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for admins to create accounts (create-account only).
+    Regular User: department is forced to None.
+    Admin: department is required and must be 'it' or 'rnd'.
+    """
+    password = serializers.CharField(write_only=True, min_length=8)
+    department = serializers.ChoiceField(
+        choices=CustomUser.DEPARTMENT_CHOICES,
+        required=False,
+        allow_null=True,
+        allow_blank=False
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'password', 'role', 'department']
+        read_only_fields = ['id']
+
+    def validate_username(self, value):
+        if CustomUser.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with that username already exists.")
+        return value
+
+    def validate_password(self, value):
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(value)
+        return value
+
+    def validate(self, data):
+        role = data.get('role')
+        department = data.get('department')
+        if role == 'admin':
+            if not department:
+                raise serializers.ValidationError({"department": "Department is required when creating an Admin account."})
+        else:
+            data['department'] = None
+        return data
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = CustomUser(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user

@@ -21,6 +21,10 @@
       <el-select v-model="filterCountry" placeholder="Country" clearable filterable class="filter-select">
         <el-option v-for="c in COUNTRIES" :key="c" :label="c" :value="c" />
       </el-select>
+      <el-select v-model="filterDepartment" placeholder="Department" clearable class="filter-select">
+        <el-option label="IT" value="it" />
+        <el-option label="R&D" value="rnd" />
+      </el-select>
       <el-select v-model="filterStatus" placeholder="Status" clearable class="filter-select">
         <el-option label="Pending Review" value="pending_review" />
         <el-option label="Under Review" value="under_review" />
@@ -56,6 +60,13 @@
       <el-table-column prop="name" label="Name" min-width="150" />
       <el-table-column prop="submitter_username" label="Submitter" width="120" />
       <el-table-column prop="country" label="Country" width="130" show-overflow-tooltip />
+      <el-table-column prop="owning_department" label="Department" width="120">
+        <template #default="scope">
+          <el-tag :type="scope.row.owning_department === 'it' ? 'primary' : 'success'" effect="plain">
+            {{ formatDepartment(scope.row.owning_department) }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="status" label="Status" width="140">
         <template #default="scope">
           <el-tooltip
@@ -244,6 +255,7 @@ const submitters = ref<{id: number, username: string}[]>([])
 const filterMyRequirements = ref(false)
 const filterSearch = ref('')
 const filterCountry = ref('')
+const filterDepartment = ref('')
 const filterStatus = ref('')
 const filterSubmitter = ref('')
 
@@ -277,6 +289,9 @@ const filteredRequests = computed(() => {
     }
     if (filterCountry.value) {
       result = result.filter(r => r.country === filterCountry.value)
+    }
+    if (filterDepartment.value) {
+      result = result.filter(r => r.owning_department === filterDepartment.value)
     }
     if (filterStatus.value) {
       result = result.filter(r => r.status === filterStatus.value)
@@ -312,6 +327,7 @@ const createForm = ref({
   name: '',
   summary: '',
     country: '',
+  owning_department: '',
   requirement_type: '',
   impacted_users: '',
   supplementary_materials: [] as string[],
@@ -426,6 +442,7 @@ const openCreateDialog = () => {
     name: '',
     summary: '',
     country: '',
+    owning_department: '',
     requirement_type: '',
     impacted_users: '',
     supplementary_materials: [],
@@ -551,6 +568,7 @@ const submitEdit = async () => {
           name: editForm.value.name,
           summary: editForm.value.summary,
           country: editForm.value.country,
+          owning_department: editForm.value.owning_department,
           requirement_type: editForm.value.requirement_type,
           impacted_users: editForm.value.impacted_users,
           supplementary_materials: editForm.value.supplementary_materials,
@@ -604,6 +622,14 @@ const formatWorkload = (workload: string) => {
     large: 'Large'
   }
   return map[workload] || workload
+}
+
+const formatDepartment = (department: string) => {
+  const map: Record<string, string> = {
+    it: 'IT',
+    rnd: 'R&D'
+  }
+  return map[department] || department || 'N/A'
 }
 
 const formatDate = (dateStr: string) => {

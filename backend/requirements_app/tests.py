@@ -1,8 +1,9 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
-from .models import RequirementRequest
+from .models import RequirementRequest, Attachment
 
 User = get_user_model()
 
@@ -35,7 +36,7 @@ def test_jwt_token_obtain_pair():
 @pytest.mark.django_db
 def test_jwt_token_obtain_pair_admin():
     client = APIClient()
-    User.objects.create_user(username='jwt_test_admin', password='securepassword123', role='admin')
+    User.objects.create_user(username='jwt_test_admin', password='securepassword123', role='admin', department='it')
     
     response = client.post('/api/token/', {'username': 'jwt_test_admin', 'password': 'securepassword123'}, format='json')
     assert response.status_code == 200
@@ -43,6 +44,7 @@ def test_jwt_token_obtain_pair_admin():
     token = AccessToken(response.data['access'])
     assert token['role'] == 'admin'
     assert token['username'] == 'jwt_test_admin'
+    assert token['department'] == 'it'
 
 @pytest.mark.django_db
 def test_jwt_token_refresh():
@@ -163,7 +165,7 @@ def test_user_locking_mechanism():
 
 @pytest.mark.django_db
 def test_admin_view_and_sorting():
-    admin = User.objects.create_user(username='admin_sort', password='pass', role='admin')
+    admin = User.objects.create_user(username='admin_sort', password='pass', role='admin', department='it')
     user = User.objects.create_user(username='user_sort', password='pass')
     
     RequirementRequest.objects.create(name='LowScore', summary='Sum', country='China', requirement_type='optimization', impacted_users='<100', submitter=user, workload='large')
@@ -181,7 +183,7 @@ def test_admin_view_and_sorting():
 
 @pytest.mark.django_db
 def test_admin_update_workload_and_status():
-    admin = User.objects.create_user(username='admin_update', password='pass', role='admin')
+    admin = User.objects.create_user(username='admin_update', password='pass', role='admin', department='it')
     user = User.objects.create_user(username='user_update', password='pass')
     req = RequirementRequest.objects.create(name='UpdateReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
     
@@ -196,7 +198,7 @@ def test_admin_update_workload_and_status():
 
 @pytest.mark.django_db
 def test_admin_field_level_restrictions():
-    admin = User.objects.create_user(username='admin_restrict', password='pass', role='admin')
+    admin = User.objects.create_user(username='admin_restrict', password='pass', role='admin', department='it')
     user = User.objects.create_user(username='user_restrict', password='pass')
     req = RequirementRequest.objects.create(
         name='OriginalName', summary='Sum', country='China', 
@@ -218,7 +220,7 @@ def test_admin_field_level_restrictions():
 
 @pytest.mark.django_db
 def test_admin_reject_with_reason():
-    admin = User.objects.create_user(username='admin_reject', password='pass', role='admin')
+    admin = User.objects.create_user(username='admin_reject', password='pass', role='admin', department='it')
     user = User.objects.create_user(username='user_reject', password='pass')
     req = RequirementRequest.objects.create(name='RejectReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
 
@@ -232,7 +234,7 @@ def test_admin_reject_with_reason():
 
 @pytest.mark.django_db
 def test_admin_reject_without_reason_fails():
-    admin = User.objects.create_user(username='admin_reject2', password='pass', role='admin')
+    admin = User.objects.create_user(username='admin_reject2', password='pass', role='admin', department='it')
     user = User.objects.create_user(username='user_reject2', password='pass')
     req = RequirementRequest.objects.create(name='RejectReq2', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
 
@@ -258,7 +260,7 @@ def test_user_can_edit_rejected_requirement():
 
 @pytest.mark.django_db
 def test_non_rejected_status_clears_reject_reason():
-    admin = User.objects.create_user(username='admin_clear', password='pass', role='admin')
+    admin = User.objects.create_user(username='admin_clear', password='pass', role='admin', department='it')
     user = User.objects.create_user(username='user_clear', password='pass')
     req = RequirementRequest.objects.create(name='ClearReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user, status='rejected', reject_reason='Old reason')
 
@@ -272,7 +274,7 @@ def test_non_rejected_status_clears_reject_reason():
 
 @pytest.mark.django_db
 def test_admin_set_estimated_completion_date():
-    admin = User.objects.create_user(username='admin_ecd', password='pass', role='admin')
+    admin = User.objects.create_user(username='admin_ecd', password='pass', role='admin', department='it')
     user = User.objects.create_user(username='user_ecd', password='pass')
     req = RequirementRequest.objects.create(name='ECDReq', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user)
 
@@ -310,14 +312,14 @@ def test_user_can_set_urgency():
 
     response = client.post('/api/requests/', {
         'name': 'UrgReq2', 'summary': 'Sum', 'country': 'China',
-        'requirement_type': 'bug', 'urgency': 'high'
+        'requirement_type': 'bug', 'urgency': 'high', 'owning_department': 'it'
     }, format='json')
     assert response.status_code == 201
     assert response.data['urgency'] == 'high'
 
 @pytest.mark.django_db
 def test_admin_cannot_modify_urgency():
-    admin = User.objects.create_user(username='admin_urgency', password='pass', role='admin')
+    admin = User.objects.create_user(username='admin_urgency', password='pass', role='admin', department='it')
     user = User.objects.create_user(username='user_urgency_owner', password='pass')
     req = RequirementRequest.objects.create(name='UrgReq3', summary='Sum', country='China', requirement_type='bug', impacted_users='<100', submitter=user, urgency='low')
 
@@ -327,3 +329,311 @@ def test_admin_cannot_modify_urgency():
     response = client.patch(f'/api/admin/requests/{req.id}/', {'workload': 'small', 'status': 'confirmed', 'urgency': 'high'}, format='json')
     assert response.status_code == 200
     assert response.data['urgency'] == 'low'
+
+@pytest.mark.django_db
+def test_owning_department_defaults_to_it():
+    user = User.objects.create_user(username='dept_default_user', password='pass')
+    req = RequirementRequest.objects.create(name='DeptReq', summary='Sum', country='China', requirement_type='bug', submitter=user)
+    assert req.owning_department == 'it'
+
+@pytest.mark.django_db
+def test_create_requirement_requires_owning_department():
+    user = User.objects.create_user(username='dept_missing_user', password='pass')
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post('/api/requests/', {
+        'name': 'NoDept', 'summary': 'Sum', 'country': 'China', 'requirement_type': 'bug'
+    }, format='json')
+    assert response.status_code == 400
+    assert 'owning_department' in response.data
+
+@pytest.mark.django_db
+def test_create_requirement_invalid_owning_department():
+    user = User.objects.create_user(username='dept_invalid_user', password='pass')
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post('/api/requests/', {
+        'name': 'BadDept', 'summary': 'Sum', 'country': 'China',
+        'requirement_type': 'bug', 'owning_department': 'hr'
+    }, format='json')
+    assert response.status_code == 400
+    assert 'owning_department' in response.data
+
+@pytest.mark.django_db
+def test_create_requirement_with_owning_department():
+    user = User.objects.create_user(username='dept_ok_user', password='pass')
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post('/api/requests/', {
+        'name': 'RndReq', 'summary': 'Sum', 'country': 'China',
+        'requirement_type': 'bug', 'owning_department': 'rnd'
+    }, format='json')
+    assert response.status_code == 201
+    assert response.data['owning_department'] == 'rnd'
+
+@pytest.mark.django_db
+def test_regular_user_sees_all_departments():
+    user = User.objects.create_user(username='dept_all_user', password='pass')
+    RequirementRequest.objects.create(name='ITReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it')
+    RequirementRequest.objects.create(name='RndReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='rnd')
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.get('/api/requests/')
+    assert response.status_code == 200
+    assert len(response.data) == 2
+
+@pytest.mark.django_db
+def test_admin_department_isolation_list():
+    it_admin = User.objects.create_user(username='it_admin', password='pass', role='admin', department='it')
+    rnd_admin = User.objects.create_user(username='rnd_admin', password='pass', role='admin', department='rnd')
+    user = User.objects.create_user(username='dept_iso_user', password='pass')
+
+    RequirementRequest.objects.create(name='ITReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it')
+    RequirementRequest.objects.create(name='RndReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='rnd')
+
+    client = APIClient()
+
+    client.force_authenticate(user=it_admin)
+    response = client.get('/api/admin/requests/')
+    assert response.status_code == 200
+    assert len(response.data) == 1
+    assert response.data[0]['name'] == 'ITReq'
+    assert response.data[0]['owning_department'] == 'it'
+
+    client.force_authenticate(user=rnd_admin)
+    response = client.get('/api/admin/requests/')
+    assert response.status_code == 200
+    assert len(response.data) == 1
+    assert response.data[0]['name'] == 'RndReq'
+    assert response.data[0]['owning_department'] == 'rnd'
+
+@pytest.mark.django_db
+def test_admin_cross_department_retrieve_and_assess_404():
+    it_admin = User.objects.create_user(username='it_admin_404', password='pass', role='admin', department='it')
+    user = User.objects.create_user(username='dept_404_user', password='pass')
+    rnd_req = RequirementRequest.objects.create(name='RndReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='rnd')
+
+    client = APIClient()
+    client.force_authenticate(user=it_admin)
+
+    response = client.get(f'/api/admin/requests/{rnd_req.id}/')
+    assert response.status_code == 404
+
+    response = client.patch(f'/api/admin/requests/{rnd_req.id}/', {'workload': 'small', 'status': 'confirmed'}, format='json')
+    assert response.status_code == 404
+
+@pytest.mark.django_db
+def test_admin_null_department_sees_empty_list():
+    admin = User.objects.create_user(username='null_dept_admin', password='pass', role='admin')
+    user = User.objects.create_user(username='null_dept_user', password='pass')
+    RequirementRequest.objects.create(name='ITReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it')
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.get('/api/admin/requests/')
+    assert response.status_code == 200
+    assert len(response.data) == 0
+
+@pytest.mark.django_db
+def test_admin_cross_department_attachment_download(tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
+    it_admin = User.objects.create_user(username='it_admin_dl', password='pass', role='admin', department='it')
+    rnd_admin = User.objects.create_user(username='rnd_admin_dl', password='pass', role='admin', department='rnd')
+    user = User.objects.create_user(username='dept_dl_user', password='pass')
+    rnd_req = RequirementRequest.objects.create(name='RndReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='rnd')
+    attachment = Attachment.objects.create(requirement=rnd_req, file=SimpleUploadedFile('doc.pdf', b'x' * 100, content_type='application/pdf'))
+
+    client = APIClient()
+
+    client.force_authenticate(user=it_admin)
+    response = client.get(f'/api/attachments/{attachment.id}/download/')
+    assert response.status_code == 403
+
+    client.force_authenticate(user=rnd_admin)
+    response = client.get(f'/api/attachments/{attachment.id}/download/')
+    assert response.status_code == 200
+
+    client.force_authenticate(user=user)
+    response = client.get(f'/api/attachments/{attachment.id}/download/')
+    assert response.status_code == 200
+
+@pytest.mark.django_db
+def test_owner_can_change_owning_department_when_pending_or_rejected():
+    user = User.objects.create_user(username='dept_change_user', password='pass')
+    req_pending = RequirementRequest.objects.create(name='PendingReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it', status='pending_review')
+    req_rejected = RequirementRequest.objects.create(name='RejectedReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it', status='rejected', reject_reason='Wrong dept')
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.patch(f'/api/requests/{req_pending.id}/', {'owning_department': 'rnd'}, format='json')
+    assert response.status_code == 200
+    assert response.data['owning_department'] == 'rnd'
+
+    response = client.patch(f'/api/requests/{req_rejected.id}/', {'owning_department': 'rnd'}, format='json')
+    assert response.status_code == 200
+    assert response.data['owning_department'] == 'rnd'
+    assert response.data['status'] == 'pending_review'
+
+@pytest.mark.django_db
+def test_owner_cannot_change_owning_department_when_locked():
+    user = User.objects.create_user(username='dept_lock_user', password='pass')
+    req = RequirementRequest.objects.create(name='LockedReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it', status='confirmed')
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.patch(f'/api/requests/{req.id}/', {'owning_department': 'rnd'}, format='json')
+    assert response.status_code == 403
+    req.refresh_from_db()
+    assert req.owning_department == 'it'
+
+@pytest.mark.django_db
+def test_admin_cannot_modify_owning_department():
+    admin = User.objects.create_user(username='it_admin_mod', password='pass', role='admin', department='it')
+    user = User.objects.create_user(username='dept_mod_user', password='pass')
+    req = RequirementRequest.objects.create(name='ITReq', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it')
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.patch(f'/api/admin/requests/{req.id}/', {'workload': 'small', 'owning_department': 'rnd'}, format='json')
+    assert response.status_code == 200
+    assert response.data['owning_department'] == 'it'
+
+@pytest.mark.django_db
+def test_admin_create_regular_user_account():
+    admin = User.objects.create_user(username='creator_admin', password='pass', role='admin', department='it')
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post('/api/admin/users/', {
+        'username': 'new_regular', 'password': 'Str0ngPass!234', 'role': 'user'
+    }, format='json')
+    assert response.status_code == 201
+    assert response.data['username'] == 'new_regular'
+    assert response.data['role'] == 'user'
+    assert response.data['department'] is None
+
+    created = User.objects.get(username='new_regular')
+    assert created.department is None
+    assert created.check_password('Str0ngPass!234')
+
+@pytest.mark.django_db
+def test_admin_create_regular_user_department_forced_none():
+    admin = User.objects.create_user(username='creator_admin2', password='pass', role='admin', department='it')
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post('/api/admin/users/', {
+        'username': 'sneaky_user', 'password': 'Str0ngPass!234', 'role': 'user', 'department': 'rnd'
+    }, format='json')
+    assert response.status_code == 201
+    assert response.data['department'] is None
+    assert User.objects.get(username='sneaky_user').department is None
+
+@pytest.mark.django_db
+def test_admin_create_admin_account():
+    admin = User.objects.create_user(username='creator_admin3', password='pass', role='admin', department='it')
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post('/api/admin/users/', {
+        'username': 'new_rnd_admin', 'password': 'Str0ngPass!234', 'role': 'admin', 'department': 'rnd'
+    }, format='json')
+    assert response.status_code == 201
+    assert response.data['role'] == 'admin'
+    assert response.data['department'] == 'rnd'
+
+    created = User.objects.get(username='new_rnd_admin')
+    assert created.role == 'admin'
+    assert created.department == 'rnd'
+    assert created.check_password('Str0ngPass!234')
+
+@pytest.mark.django_db
+def test_admin_create_admin_requires_department():
+    admin = User.objects.create_user(username='creator_admin4', password='pass', role='admin', department='it')
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post('/api/admin/users/', {
+        'username': 'no_dept_admin', 'password': 'Str0ngPass!234', 'role': 'admin'
+    }, format='json')
+    assert response.status_code == 400
+    assert 'department' in response.data
+    assert not User.objects.filter(username='no_dept_admin').exists()
+
+@pytest.mark.django_db
+def test_admin_create_admin_invalid_department():
+    admin = User.objects.create_user(username='creator_admin5', password='pass', role='admin', department='it')
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post('/api/admin/users/', {
+        'username': 'bad_dept_admin', 'password': 'Str0ngPass!234', 'role': 'admin', 'department': 'hr'
+    }, format='json')
+    assert response.status_code == 400
+    assert 'department' in response.data
+
+@pytest.mark.django_db
+def test_admin_create_duplicate_username():
+    admin = User.objects.create_user(username='creator_admin6', password='pass', role='admin', department='it')
+    User.objects.create_user(username='existing_user', password='pass')
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post('/api/admin/users/', {
+        'username': 'existing_user', 'password': 'Str0ngPass!234', 'role': 'user'
+    }, format='json')
+    assert response.status_code == 400
+    assert 'username' in response.data
+
+@pytest.mark.django_db
+def test_admin_create_weak_password_rejected():
+    admin = User.objects.create_user(username='creator_admin7', password='pass', role='admin', department='it')
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post('/api/admin/users/', {
+        'username': 'weak_pass_user', 'password': '123', 'role': 'user'
+    }, format='json')
+    assert response.status_code == 400
+    assert 'password' in response.data
+
+@pytest.mark.django_db
+def test_regular_user_cannot_create_accounts():
+    user = User.objects.create_user(username='regular_no_power', password='pass')
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post('/api/admin/users/', {
+        'username': 'hacked_user', 'password': 'Str0ngPass!234', 'role': 'user'
+    }, format='json')
+    assert response.status_code == 403
+    assert not User.objects.filter(username='hacked_user').exists()
+
+@pytest.mark.django_db
+def test_unauthenticated_cannot_create_accounts():
+    client = APIClient()
+
+    response = client.post('/api/admin/users/', {
+        'username': 'anon_user', 'password': 'Str0ngPass!234', 'role': 'user'
+    }, format='json')
+    assert response.status_code == 401
+
+@pytest.mark.django_db
+def test_jwt_department_claim_regular_user_is_none():
+    client = APIClient()
+    User.objects.create_user(username='jwt_dept_user', password='securepassword123', role='user')
+
+    response = client.post('/api/token/', {'username': 'jwt_dept_user', 'password': 'securepassword123'}, format='json')
+    assert response.status_code == 200
+
+    token = AccessToken(response.data['access'])
+    assert token['department'] is None

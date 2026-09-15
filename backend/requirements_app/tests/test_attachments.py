@@ -25,6 +25,7 @@ def get_base_payload():
         'country': 'China',
         'requirement_type': 'bug',
         'impacted_users': '<100',
+        'owning_department': 'it',
     }
 
 def create_file(name, size_bytes):
@@ -39,7 +40,7 @@ class TestAttachmentUpload:
         file1 = create_file('doc1.pdf', 1024)
         file2 = create_file('img1.jpg', 1024)
         
-        payload['attachments'] = [file1, file2]
+        payload['uploaded_files'] = [file1, file2]
         
         response = authenticated_client.post('/api/requests/', payload, format='multipart')
         assert response.status_code == status.HTTP_201_CREATED
@@ -48,7 +49,7 @@ class TestAttachmentUpload:
     def test_reject_more_than_3_files(self, authenticated_client, tmp_path, settings):
         settings.MEDIA_ROOT = tmp_path
         payload = get_base_payload()
-        payload['attachments'] = [
+        payload['uploaded_files'] = [
             create_file('f1.pdf', 100),
             create_file('f2.pdf', 100),
             create_file('f3.pdf', 100),
@@ -56,24 +57,24 @@ class TestAttachmentUpload:
         ]
         response = authenticated_client.post('/api/requests/', payload, format='multipart')
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'attachments' in response.data
+        assert 'uploaded_files' in response.data
 
     def test_reject_total_size_over_10mb(self, authenticated_client, tmp_path, settings):
         settings.MEDIA_ROOT = tmp_path
         payload = get_base_payload()
         # 6MB each, total 12MB > 10MB
-        payload['attachments'] = [
+        payload['uploaded_files'] = [
             create_file('large1.pdf', 6 * 1024 * 1024),
             create_file('large2.pdf', 6 * 1024 * 1024),
         ]
         response = authenticated_client.post('/api/requests/', payload, format='multipart')
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'attachments' in response.data
+        assert 'uploaded_files' in response.data
 
     def test_reject_invalid_extension(self, authenticated_client, tmp_path, settings):
         settings.MEDIA_ROOT = tmp_path
         payload = get_base_payload()
-        payload['attachments'] = [create_file('malware.exe', 1024)]
+        payload['uploaded_files'] = [create_file('malware.exe', 1024)]
         response = authenticated_client.post('/api/requests/', payload, format='multipart')
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'attachments' in response.data
+        assert 'uploaded_files' in response.data

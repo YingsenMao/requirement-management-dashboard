@@ -5,6 +5,12 @@
         <div class="card-header">
           <div class="header-title">
             <span class="title-text">Requirement Management Dashboard</span>
+            <el-tag v-if="authStore.department" :type="authStore.department === 'it' ? 'primary' : 'success'" effect="dark" round class="dept-badge">
+              {{ formatDepartment(authStore.department) }} Department
+            </el-tag>
+          </div>
+          <div class="header-actions">
+            <el-button type="primary" plain :icon="UserFilled" @click="openUserDialog">User Management</el-button>
           </div>
         </div>
       </template>
@@ -143,6 +149,9 @@
         <el-descriptions :column="2" border size="default" class="request-details">
           <el-descriptions-item label="Name">{{ selectedRequest.name }}</el-descriptions-item>
           <el-descriptions-item label="Country">{{ selectedRequest.country }}</el-descriptions-item>
+          <el-descriptions-item label="Owning Department">
+            <el-tag :type="selectedRequest.owning_department === 'it' ? 'primary' : 'success'" effect="plain" round>{{ formatDepartment(selectedRequest.owning_department) }}</el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="Requirement Type">{{ formatType(selectedRequest.requirement_type) }}</el-descriptions-item>
           <el-descriptions-item label="Impacted Users">{{ formatUsers(selectedRequest.impacted_users) }}</el-descriptions-item>
           <el-descriptions-item label="Revenue Impact">{{ formatRevenue(selectedRequest.revenue_impact) }}</el-descriptions-item>
@@ -214,6 +223,36 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- User Management Dialog (Create Account Only) -->
+    <el-dialog v-model="showUserDialog" title="User Management - Create Account" width="480" destroy-on-close>
+      <el-form :model="userForm" label-width="110px" class="user-form">
+        <el-form-item label="Username" required>
+          <el-input v-model="userForm.username" placeholder="Enter username" maxlength="150" />
+        </el-form-item>
+        <el-form-item label="Password" required>
+          <el-input v-model="userForm.password" type="password" placeholder="Min 8 characters" show-password />
+        </el-form-item>
+        <el-form-item label="Role" required>
+          <el-select v-model="userForm.role" placeholder="Select role" class="field-block" @change="handleRoleChange">
+            <el-option label="Regular User" value="user" />
+            <el-option label="Admin" value="admin" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="userForm.role === 'admin'" label="Department" required>
+          <el-select v-model="userForm.department" placeholder="Select department" class="field-block">
+            <el-option label="IT" value="it" />
+            <el-option label="R&D" value="rnd" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showUserDialog = false">Cancel</el-button>
+          <el-button type="primary" @click="submitCreateUser" :loading="creatingUser">Create Account</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -222,8 +261,9 @@ import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { ElMessage } from 'element-plus'
-import { Search, Document, Tickets, Clock, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { Search, Document, Tickets, Clock, CircleCheck, CircleClose, UserFilled } from '@element-plus/icons-vue'
 import { COUNTRIES } from '../constants/countries'
+import { createUserAccount } from '../api/users'
 
 const authStore = useAuthStore()
 
@@ -233,6 +273,71 @@ const showAssessDialog = ref(false)
 const assessing = ref(false)
 const assessingId = ref<number | null>(null)
 const selectedRequest = ref<any>(null)
+
+// User Management (Create Account Only)
+const showUserDialog = ref(false)
+const creatingUser = ref(false)
+const userForm = ref({
+  username: '',
+  password: '',
+  role: 'user' as 'admin' | 'user',
+  department: '' as 'it' | 'rnd' | ''
+})
+
+const openUserDialog = () => {
+  userForm.value = {
+    username: '',
+    password: '',
+    role: 'user',
+    department: ''
+  }
+  showUserDialog.value = true
+}
+
+const handleRoleChange = (role: 'admin' | 'user') => {
+  if (role !== 'admin') {
+    userForm.value.department = ''
+  }
+}
+
+const submitCreateUser = async () => {
+  if (!userForm.value.username.trim()) {
+    ElMessage.warning('Please enter a username')
+    return
+  }
+  if (!userForm.value.password) {
+    ElMessage.warning('Please enter a password')
+    return
+  }
+  if (userForm.value.role === 'admin' && !userForm.value.department) {
+    ElMessage.warning('Please select a department for the admin account')
+    return
+  }
+  creatingUser.value = true
+  try {
+    await createUserAccount(authStore.token || '', {
+      username: userForm.value.username.trim(),
+      password: userForm.value.password,
+      role: userForm.value.role,
+      department: userForm.value.role === 'admin' ? (userForm.value.department || null) : null
+    })
+    ElMessage.success(`Account "${userForm.value.username.trim()}" created successfully`)
+    showUserDialog.value = false
+    fetchSubmitters()
+  } catch (error: any) {
+    console.error('Failed to create account', error)
+    const data = error?.response?.data
+    if (data && typeof data === 'object') {
+      const firstKey = Object.keys(data)[0]
+      const message = Array.isArray(data[firstKey]) ? data[firstKey][0] : String(data[firstKey])
+      ElMessage.error(`${firstKey}: ${message}`)
+    } else {
+      ElMessage.error('Failed to create account')
+    }
+  } finally {
+    creatingUser.value = false
+  }
+}
 
 const assessForm = ref({
   workload: '',
@@ -420,6 +525,14 @@ const formatWorkload = (workload: string) => {
   return map[workload] || workload
 }
 
+const formatDepartment = (department: string | null) => {
+  const map: Record<string, string> = {
+    it: 'IT',
+    rnd: 'R&D'
+  }
+  return map[department || ''] || department || 'N/A'
+}
+
 const getWorkloadType = (workload: string) => {
   const map: Record<string, string> = {
     pending: 'info',
@@ -539,6 +652,20 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dept-badge {
+  margin-left: var(--space-2);
+}
+
+.user-form {
+  padding: 0 var(--space-1);
 }
 
 .brand-icon {

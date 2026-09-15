@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from django.db.models import F, Case, When, Value, IntegerField
 from django.http import FileResponse, Http404
 from .models import RequirementRequest, Attachment, CustomUser
-from .serializers import RequirementRequestSerializer, AdminRequirementSerializer
+from .serializers import RequirementRequestSerializer, AdminRequirementSerializer, UserCreateSerializer
 from .permissions import IsOwnerAndPendingReview, IsAdminUser
 
 class UserRequirementViewSet(viewsets.ModelViewSet):
@@ -42,7 +42,9 @@ class UserRequirementViewSet(viewsets.ModelViewSet):
 
 class AdminRequirementViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for admins to view and manage all requirement requests.
+    ViewSet for admins to view and manage requirement requests
+    scoped to their own department (IT admins see IT requests only,
+    R&D admins see R&D requests only).
     """
     serializer_class = AdminRequirementSerializer
     permission_classes = [IsAdminUser]
@@ -50,7 +52,10 @@ class AdminRequirementViewSet(viewsets.ModelViewSet):
     pagination_class = None
 
     def get_queryset(self):
-        return RequirementRequest.objects.select_related('submitter').prefetch_related('attachments').annotate(
+        department = getattr(self.request.user, 'department', None)
+        if not department:
+            return RequirementRequest.objects.none()
+        return RequirementRequest.objects.filter(owning_department=department).select_related('submitter').prefetch_related('attachments').annotate(
             is_completed=Case(
                 When(status='completed', then=Value(1)),
                 default=Value(0),
@@ -70,6 +75,28 @@ class UserListView(APIView):
         return Response(list(users))
 
 
+class UserCreateView(APIView):
+    """
+    Admin-only endpoint to create accounts (create-account only).
+    Regular User accounts have no department; Admin accounts require one.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        serializer = UserCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(
+            {
+                'id': user.id,
+                'username': user.username,
+                'role': user.role,
+                'department': user.department,
+            },
+            status=201
+        )
+
+
 class AttachmentDownloadView(APIView):
     """
     Secure endpoint to download attachments.
@@ -86,11 +113,12 @@ class AttachmentDownloadView(APIView):
         requirement = attachment.requirement
         user = request.user
 
-        # Defensive Permission Check: Admin or Submitter
+        # Defensive Permission Check: Admin (same department) or Submitter
         is_admin = getattr(user, 'role', None) == 'admin'
+        is_same_department_admin = is_admin and getattr(user, 'department', None) == requirement.owning_department
         is_submitter = requirement.submitter_id == user.id
 
-        if not (is_admin or is_submitter):
+        if not (is_same_department_admin or is_submitter):
             return Response({"detail": "You do not have permission to download this file."}, status=403)
 
         file_path = attachment.file.path

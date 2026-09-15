@@ -11,6 +11,19 @@
       <div class="section-header">
         <span class="section-title">Basic Information</span>
       </div>
+      <el-form-item label="Owning Department" prop="owning_department">
+        <el-tooltip content="Select the department that should own this requirement. Only admins of this department will be able to review it." placement="top" :show-after="300">
+          <el-select
+            :model-value="modelValue.owning_department"
+            @update:model-value="updateField('owning_department', $event)"
+            placeholder="Select owning department"
+            class="field-block"
+          >
+            <el-option label="IT" value="it" />
+            <el-option label="R&D" value="rnd" />
+          </el-select>
+        </el-tooltip>
+      </el-form-item>
       <el-form-item label="Name" prop="name">
         <el-input
           :model-value="modelValue.name"
@@ -268,6 +281,7 @@ const emit = defineEmits<{
 }>()
 
 const rules: FormRules = {
+  owning_department: [{ required: true, message: 'Please select owning department', trigger: 'change' }],
   name: [{ required: true, message: 'Please enter requirement name', trigger: 'blur' }],
   summary: [{ required: true, message: 'Please enter description', trigger: 'blur' }],
   country: [{ required: true, message: 'Please select country', trigger: 'change' }],

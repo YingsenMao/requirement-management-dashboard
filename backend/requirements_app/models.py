@@ -7,7 +7,12 @@ class CustomUser(AbstractUser):
         ('admin', 'Admin'),
         ('user', 'Regular User'),
     )
+    DEPARTMENT_CHOICES = (
+        ('it', 'IT'),
+        ('rnd', 'R&D'),
+    )
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='user')
+    department = models.CharField(max_length=10, choices=DEPARTMENT_CHOICES, null=True, blank=True)
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
@@ -59,9 +64,15 @@ class RequirementRequest(models.Model):
         ('rejected', 'Rejected'),
     ]
 
+    DEPARTMENT_CHOICES = [
+        ('it', 'IT'),
+        ('rnd', 'R&D'),
+    ]
+
     name = models.CharField(max_length=255)
     summary = models.TextField()
     country = models.CharField(max_length=100)
+    owning_department = models.CharField(max_length=10, choices=DEPARTMENT_CHOICES, default='it')
     requirement_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     impacted_users = models.CharField(max_length=10, choices=USERS_CHOICES, null=True, blank=True)
     supplementary_materials = models.JSONField(default=list, blank=True)
