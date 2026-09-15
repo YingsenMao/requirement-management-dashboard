@@ -182,6 +182,30 @@
           </el-descriptions-item>
         </el-descriptions>
 
+        <!-- AI Review History Panel -->
+        <div v-if="reviewSessions.length > 0" class="ai-review-history">
+          <el-divider content-position="left">AI Review History</el-divider>
+          <el-collapse v-model="activeReviewSession">
+            <el-collapse-item v-for="session in reviewSessions" :key="session.id" :name="session.id">
+              <template #title>
+                <span>Session #{{ session.id }} ({{ session.mode }}) - {{ formatStatus(session.status) }}</span>
+              </template>
+              <div class="review-session-detail">
+                <div v-for="(msg, idx) in session.messages" :key="idx" :class="['review-message', msg.role]">
+                  <div class="message-role">{{ msg.role === 'ai' ? 'AI' : 'User' }}:</div>
+                  <div class="message-text" v-html="msg.content"></div>
+                </div>
+                <div v-if="session.generated_description" class="generated-result">
+                  <h5>Generated Description:</h5>
+                  <div v-html="session.generated_description"></div>
+                  <h5>Generated Acceptance Criteria:</h5>
+                  <div v-html="session.generated_acceptance"></div>
+                </div>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+
         <el-divider content-position="left">Admin Assessment</el-divider>
         <el-form :model="assessForm" label-width="120px" class="assess-form">
           <el-row :gutter="20">
@@ -264,6 +288,7 @@ import { ElMessage } from 'element-plus'
 import { Search, Document, Tickets, Clock, CircleCheck, CircleClose, UserFilled } from '@element-plus/icons-vue'
 import { COUNTRIES } from '../constants/countries'
 import { createUserAccount } from '../api/users'
+import { getAdminReviewSessions } from '../api/aiReview'
 
 const authStore = useAuthStore()
 
@@ -273,6 +298,10 @@ const showAssessDialog = ref(false)
 const assessing = ref(false)
 const assessingId = ref<number | null>(null)
 const selectedRequest = ref<any>(null)
+
+// AI Review History
+const reviewSessions = ref<any[]>([])
+const activeReviewSession = ref<number[]>([])
 
 // User Management (Create Account Only)
 const showUserDialog = ref(false)
@@ -417,7 +446,7 @@ const fetchRequests = async () => {
   }
 }
 
-const handleAssess = (row: any) => {
+const handleAssess = async (row: any) => {
   assessingId.value = row.id
   selectedRequest.value = row
   assessForm.value = {
@@ -426,6 +455,21 @@ const handleAssess = (row: any) => {
     reject_reason: row.reject_reason || '',
     estimated_completion_date: row.estimated_completion_date || null
   }
+  
+  // Fetch AI review sessions if requirement has them
+  if (row.owning_department === 'it') {
+    try {
+      const response = await getAdminReviewSessions(authStore.token || '', row.id)
+      reviewSessions.value = response.data
+      activeReviewSession.value = reviewSessions.value.length > 0 ? [reviewSessions.value[0].id] : []
+    } catch (error) {
+      console.error('Failed to fetch review sessions', error)
+      reviewSessions.value = []
+    }
+  } else {
+    reviewSessions.value = []
+  }
+  
   showAssessDialog.value = true
 }
 
@@ -666,6 +710,53 @@ onMounted(() => {
 
 .user-form {
   padding: 0 var(--space-1);
+}
+
+.ai-review-history {
+  margin-top: var(--space-4);
+}
+
+.review-session-detail {
+  padding: var(--space-2);
+}
+
+.review-message {
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-form);
+}
+
+.review-message.ai {
+  border-left: 3px solid var(--color-accent);
+}
+
+.review-message.user {
+  border-left: 3px solid var(--color-text-secondary);
+}
+
+.message-role {
+  font-weight: var(--font-weight-semibold);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.message-text {
+  line-height: 1.5;
+}
+
+.generated-result {
+  margin-top: var(--space-3);
+  padding: var(--space-2);
+  background: var(--color-surface-card);
+  border-radius: var(--radius-md);
+}
+
+.generated-result h5 {
+  margin: var(--space-2) 0 var(--space-1) 0;
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
 }
 
 .brand-icon {

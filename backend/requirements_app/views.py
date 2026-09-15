@@ -6,11 +6,16 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
+from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db.models import F, Case, When, Value, IntegerField
 from django.http import FileResponse, Http404
-from .models import RequirementRequest, Attachment, CustomUser
-from .serializers import RequirementRequestSerializer, AdminRequirementSerializer, UserCreateSerializer
+from django.conf import settings
+from .models import RequirementRequest, Attachment, CustomUser, ReviewSession, ReviewMessage
+from .serializers import RequirementRequestSerializer, AdminRequirementSerializer, UserCreateSerializer, ReviewSessionSerializer, ReviewSessionCreateSerializer, ReviewMessageSerializer
 from .permissions import IsOwnerAndPendingReview, IsAdminUser
+from .services.ai_review import AiReviewClient
+from rest_framework.throttling import UserRateThrottle
 
 class UserRequirementViewSet(viewsets.ModelViewSet):
     """
@@ -19,6 +24,7 @@ class UserRequirementViewSet(viewsets.ModelViewSet):
     """
     serializer_class = RequirementRequestSerializer
     permission_classes = [IsAuthenticated, IsOwnerAndPendingReview]
+    authentication_classes = [JWTAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
 
@@ -48,6 +54,7 @@ class AdminRequirementViewSet(viewsets.ModelViewSet):
     """
     serializer_class = AdminRequirementSerializer
     permission_classes = [IsAdminUser]
+    authentication_classes = [JWTAuthentication]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
 
@@ -95,6 +102,187 @@ class UserCreateView(APIView):
             },
             status=201
         )
+
+
+class AIReviewThrottle(UserRateThrottle):
+    scope = 'ai_review'
+
+
+class ReviewSessionView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AIReviewThrottle]
+
+    def post(self, request):
+        if not getattr(settings, 'DASHSCOPE_API_KEY', None):
+            return Response({"detail": "AI review service not configured"}, status=503)
+
+        serializer = ReviewSessionCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        mode = serializer.validated_data['mode']
+        requirement_id = serializer.validated_data.get('requirement_id')
+        form_context = serializer.validated_data['form_context']
+
+        if mode == 'edit':
+            try:
+                requirement = RequirementRequest.objects.get(id=requirement_id)
+            except RequirementRequest.DoesNotExist:
+                return Response({"detail": "Requirement not found"}, status=404)
+            if requirement.submitter != request.user:
+                return Response({"detail": "You do not own this requirement"}, status=403)
+            if requirement.status not in ['pending_review', 'rejected']:
+                return Response({"detail": "Requirement is locked"}, status=400)
+        else:
+            requirement = None
+
+        active_sessions = ReviewSession.objects.filter(user=request.user, status__in=['asking', 'generated']).count()
+        if active_sessions >= 3:
+            return Response({"detail": "Maximum 3 active review sessions allowed"}, status=400)
+
+        session = ReviewSession.objects.create(
+            user=request.user,
+            requirement=requirement,
+            mode=mode,
+            status='asking',
+            form_context=form_context
+        )
+
+        try:
+            client = AiReviewClient()
+            messages = [
+                {"role": "user", "content": f"Here is my requirement:\n\nName: {form_context.get('name')}\n\nDescription: {form_context.get('summary')}"}
+            ]
+            result = client.chat(messages, question_count=0)
+
+            if not result.get('finished'):
+                question = result.get('question', 'Please tell me more about your requirement.')
+                ReviewMessage.objects.create(session=session, role='ai', content=question)
+                return Response({
+                    'session_id': session.id,
+                    'question': question,
+                    'finished': False
+                }, status=201)
+            else:
+                session.status = 'generated'
+                session.generated_description = result.get('description_html', '')
+                session.generated_acceptance = result.get('acceptance_criteria_html', '')
+                session.save()
+                ReviewMessage.objects.create(session=session, role='ai', content=f"[Generated result]\nDescription: {result.get('description_html', '')}\nAcceptance Criteria: {result.get('acceptance_criteria_html', '')}")
+                return Response({
+                    'session_id': session.id,
+                    'finished': True,
+                    'description_html': result.get('description_html', ''),
+                    'acceptance_criteria_html': result.get('acceptance_criteria_html', '')
+                }, status=201)
+        except Exception as e:
+            session.delete()
+            return Response({"detail": f"AI service error: {str(e)}"}, status=500)
+
+
+class ReviewMessageView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AIReviewThrottle]
+
+    def post(self, request, session_id):
+        if not getattr(settings, 'DASHSCOPE_API_KEY', None):
+            return Response({"detail": "AI review service not configured"}, status=503)
+
+        try:
+            session = ReviewSession.objects.get(id=session_id, user=request.user)
+        except ReviewSession.DoesNotExist:
+            return Response({"detail": "Session not found"}, status=404)
+
+        if session.status != 'asking':
+            return Response({"detail": "Session is not in asking state"}, status=400)
+
+        serializer = ReviewMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        answer = serializer.validated_data['answer']
+
+        ReviewMessage.objects.create(session=session, role='user', content=answer)
+
+        messages_qs = ReviewMessage.objects.filter(session=session).order_by('created_at')
+        messages = [{"role": m.role, "content": m.content} for m in messages_qs]
+
+        question_count = messages_qs.filter(role='ai').count()
+
+        try:
+            client = AiReviewClient()
+            result = client.chat(messages, question_count=question_count)
+
+            if not result.get('finished'):
+                question = result.get('question', 'Please tell me more.')
+                ReviewMessage.objects.create(session=session, role='ai', content=question)
+                return Response({
+                    'finished': False,
+                    'question': question
+                })
+            else:
+                session.status = 'generated'
+                session.generated_description = result.get('description_html', '')
+                session.generated_acceptance = result.get('acceptance_criteria_html', '')
+                session.save()
+                ReviewMessage.objects.create(session=session, role='ai', content=f"[Generated result]\nDescription: {result.get('description_html', '')}\nAcceptance Criteria: {result.get('acceptance_criteria_html', '')}")
+                return Response({
+                    'finished': True,
+                    'description_html': result.get('description_html', ''),
+                    'acceptance_criteria_html': result.get('acceptance_criteria_html', '')
+                })
+        except Exception as e:
+            return Response({"detail": f"AI service error: {str(e)}"}, status=500)
+
+
+class ReviewSessionConfirmView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        try:
+            session = ReviewSession.objects.get(id=session_id, user=request.user)
+        except ReviewSession.DoesNotExist:
+            return Response({"detail": "Session not found"}, status=404)
+
+        if session.status != 'generated':
+            return Response({"detail": "Session is not in generated state"}, status=400)
+
+        session.status = 'confirmed'
+        session.save()
+        return Response({"detail": "Session confirmed"})
+
+
+class ReviewSessionDiscardView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        try:
+            session = ReviewSession.objects.get(id=session_id, user=request.user)
+        except ReviewSession.DoesNotExist:
+            return Response({"detail": "Session not found"}, status=404)
+
+        session.status = 'discarded'
+        session.save()
+        return Response({"detail": "Session discarded"})
+
+
+class AdminReviewSessionsView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, requirement_id):
+        try:
+            requirement = RequirementRequest.objects.get(id=requirement_id)
+        except RequirementRequest.DoesNotExist:
+            return Response({"detail": "Requirement not found"}, status=404)
+
+        if requirement.owning_department != request.user.department:
+            return Response({"detail": "Requirement not found"}, status=404)
+
+        sessions = ReviewSession.objects.filter(requirement=requirement).order_by('-created_at')
+        serializer = ReviewSessionSerializer(sessions, many=True)
+        return Response(serializer.data)
 
 
 class AttachmentDownloadView(APIView):

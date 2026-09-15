@@ -139,6 +139,7 @@
         @upload-change="handleCreateUploadChange"
         @upload-remove="handleCreateUploadRemove"
         @download="handleDownload"
+        @ai-review="openAiReview('create')"
       />
       <template #footer>
         <el-button @click="showCreateDialog = false">Cancel</el-button>
@@ -159,12 +160,22 @@
         @upload-remove="handleEditUploadRemove"
         @upload-preview="handleEditPreview"
         @download="handleDownload"
+        @ai-review="openAiReview('edit')"
       />
       <template #footer>
         <el-button @click="showEditDialog = false">Cancel</el-button>
         <el-button v-if="!isFormLocked" type="primary" @click="submitEdit" :loading="submitting">Save Changes</el-button>
       </template>
     </el-dialog>
+
+    <!-- AI Review Dialog -->
+    <AiReviewDialog
+      v-model="showAiReviewDialog"
+      :mode="aiReviewMode"
+      :requirement-id="editingId || undefined"
+      :form-context="aiReviewFormContext"
+      @apply="handleAiReviewApply"
+    />
 
     <!-- Admin Assess Dialog -->
     <el-dialog v-model="showAssessDialog" title="Assess Requirement" width="500">
@@ -228,6 +239,7 @@ import { createRequirementRequest, updateRequirementRequest, assessRequirementRe
 import { Warning, Search, Document } from '@element-plus/icons-vue'
 import { COUNTRIES } from '../constants/countries'
 import RequirementForm from '../components/RequirementForm.vue'
+import AiReviewDialog from '../components/AiReviewDialog.vue'
 
 const authStore = useAuthStore()
 
@@ -249,6 +261,11 @@ const editStagedFiles = ref<File[]>([])
 const deletedAttachmentIds = ref<number[]>([])
 
 const assessForm = ref<any>({})
+
+// AI Review states
+const showAiReviewDialog = ref(false)
+const aiReviewMode = ref<'create' | 'edit'>('create')
+const aiReviewFormContext = ref<any>({})
 
 // Filter states
 const submitters = ref<{id: number, username: string}[]>([])
@@ -397,6 +414,34 @@ const handleEditPreview = (file: UploadUserFile) => {
   if ((file as any).id) {
     handleDownload((file as any).id, file.name)
   }
+}
+
+const openAiReview = (mode: 'create' | 'edit') => {
+  aiReviewMode.value = mode
+  if (mode === 'create') {
+    aiReviewFormContext.value = {
+      name: createForm.value.name,
+      summary: createForm.value.summary,
+      requirement_type: createForm.value.requirement_type
+    }
+  } else {
+    aiReviewFormContext.value = {
+      name: editForm.value.name,
+      summary: editForm.value.summary,
+      requirement_type: editForm.value.requirement_type
+    }
+  }
+  showAiReviewDialog.value = true
+}
+
+const handleAiReviewApply = (description: string, acceptance: string) => {
+  const combinedHtml = `${description}<h4>Acceptance Criteria</h4>${acceptance}`
+  if (aiReviewMode.value === 'create') {
+    createForm.value.summary = combinedHtml
+  } else {
+    editForm.value.summary = combinedHtml
+  }
+  showAiReviewDialog.value = false
 }
 
 const fetchRequests = async () => {

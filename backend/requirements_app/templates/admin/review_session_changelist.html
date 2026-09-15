@@ -1,0 +1,186 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block title %}AI 评审审计 / AI Review Audit{% endblock %}
+
+{% block content_title %}
+<h1>AI 评审审计 / AI Review Audit</h1>
+{% endblock %}
+
+{% block content %}
+<style>
+    .audit-stats-panel {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .audit-stats-panel h2 {
+        margin-top: 0;
+        font-size: 16px;
+        color: #333;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 8px;
+    }
+    .audit-summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .audit-card {
+        background: white;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-align: center;
+    }
+    .audit-card-label {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    .audit-card-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #417690;
+    }
+    .audit-card-rate {
+        font-size: 18px;
+        font-weight: bold;
+        color: #28a745;
+    }
+    .audit-user-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+    .audit-user-table th {
+        background: #417690;
+        color: white;
+        padding: 8px;
+        text-align: left;
+        font-size: 13px;
+    }
+    .audit-user-table td {
+        padding: 8px;
+        border-bottom: 1px solid #ddd;
+        font-size: 13px;
+    }
+    .audit-user-table tr:hover {
+        background: #f5f5f5;
+    }
+    .audit-status-breakdown {
+        margin-top: 15px;
+    }
+    .audit-status-breakdown h3 {
+        font-size: 14px;
+        margin: 10px 0 5px 0;
+        color: #333;
+    }
+    .audit-status-list {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    .audit-status-item {
+        background: white;
+        padding: 8px 15px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .audit-status-label {
+        font-size: 12px;
+        color: #666;
+    }
+    .audit-status-value {
+        font-size: 16px;
+        font-weight: bold;
+        color: #417690;
+    }
+</style>
+
+<div class="audit-stats-panel">
+    <h2>📊 审计概览 / Audit Overview</h2>
+
+    <div class="audit-summary-cards">
+        <div class="audit-card">
+            <div class="audit-card-label">总会话数<br>Total Sessions</div>
+            <div class="audit-card-value">{{ audit_total_sessions }}</div>
+        </div>
+        <div class="audit-card">
+            <div class="audit-card-label">总消息数<br>Total Messages</div>
+            <div class="audit-card-value">{{ audit_total_messages }}</div>
+        </div>
+        <div class="audit-card">
+            <div class="audit-card-label">独立用户数<br>Unique Users</div>
+            <div class="audit-card-value">{{ audit_unique_users }}</div>
+        </div>
+        <div class="audit-card">
+            <div class="audit-card-label">确认率<br>Confirmation Rate</div>
+            <div class="audit-card-rate">{{ audit_confirmation_rate|floatformat:1 }}%</div>
+        </div>
+        <div class="audit-card">
+            <div class="audit-card-label">平均消息数/会话<br>Avg Messages/Session</div>
+            <div class="audit-card-value">{{ audit_avg_messages|floatformat:1 }}</div>
+        </div>
+    </div>
+
+    <div class="audit-status-breakdown">
+        <h3>状态分布 / Status Breakdown</h3>
+        <div class="audit-status-list">
+            <div class="audit-status-item">
+                <div class="audit-status-label">Asking (进行中)</div>
+                <div class="audit-status-value">{{ audit_status_counts.asking|default:0 }}</div>
+            </div>
+            <div class="audit-status-item">
+                <div class="audit-status-label">Generated (已生成)</div>
+                <div class="audit-status-value">{{ audit_status_counts.generated|default:0 }}</div>
+            </div>
+            <div class="audit-status-item">
+                <div class="audit-status-label">Confirmed (已确认)</div>
+                <div class="audit-status-value">{{ audit_status_counts.confirmed|default:0 }}</div>
+            </div>
+            <div class="audit-status-item">
+                <div class="audit-status-label">Discarded (已丢弃)</div>
+                <div class="audit-status-value">{{ audit_status_counts.discarded|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <h3>按用户使用统计 / Per-User Usage</h3>
+        {% if audit_per_user %}
+        <table class="audit-user-table">
+            <thead>
+                <tr>
+                    <th>用户名 / Username</th>
+                    <th>角色 / Role</th>
+                    <th>会话数 / Sessions</th>
+                    <th>消息数 / Messages</th>
+                    <th>已确认 / Confirmed</th>
+                    <th>最近使用 / Last Activity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user_stat in audit_per_user %}
+                <tr>
+                    <td>{{ user_stat.user__username }}</td>
+                    <td>{{ user_stat.user__role }}</td>
+                    <td>{{ user_stat.sessions }}</td>
+                    <td>{{ user_stat.messages }}</td>
+                    <td>{{ user_stat.confirmed }}</td>
+                    <td>{{ user_stat.last_activity|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color: #666; font-style: italic;">暂无数据 / No data available</p>
+        {% endif %}
+    </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

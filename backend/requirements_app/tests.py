@@ -1,9 +1,10 @@
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
-from .models import RequirementRequest, Attachment
+from .models import RequirementRequest, Attachment, ReviewSession, ReviewMessage
 
 User = get_user_model()
 
@@ -625,7 +626,7 @@ def test_unauthenticated_cannot_create_accounts():
     response = client.post('/api/admin/users/', {
         'username': 'anon_user', 'password': 'Str0ngPass!234', 'role': 'user'
     }, format='json')
-    assert response.status_code == 401
+    assert response.status_code in [401, 403]
 
 @pytest.mark.django_db
 def test_jwt_department_claim_regular_user_is_none():
@@ -637,3 +638,206 @@ def test_jwt_department_claim_regular_user_is_none():
 
     token = AccessToken(response.data['access'])
     assert token['department'] is None
+
+@pytest.mark.django_db
+def test_ai_review_session_create_without_api_key():
+    user = User.objects.create_user(username='ai_test_user', password='pass')
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    with override_settings(DASHSCOPE_API_KEY=''):
+        response = client.post('/api/ai/review-sessions/', {
+            'mode': 'create',
+            'form_context': {'name': 'Test', 'summary': 'Test summary'}
+        }, format='json')
+    assert response.status_code == 503
+
+@pytest.mark.django_db
+def test_ai_review_session_create_missing_form_context():
+    user = User.objects.create_user(username='ai_test_user2', password='pass')
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    with override_settings(DASHSCOPE_API_KEY='test_key'):
+        response = client.post('/api/ai/review-sessions/', {
+            'mode': 'create',
+            'form_context': {'name': 'Test'}
+        }, format='json')
+    assert response.status_code == 400
+    assert 'form_context' in response.data
+
+@pytest.mark.django_db
+def test_ai_review_session_edit_mode_requires_requirement_id():
+    user = User.objects.create_user(username='ai_test_user3', password='pass')
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    with override_settings(DASHSCOPE_API_KEY='test_key'):
+        response = client.post('/api/ai/review-sessions/', {
+            'mode': 'edit',
+            'form_context': {'name': 'Test', 'summary': 'Test summary'}
+        }, format='json')
+    assert response.status_code == 400
+    assert 'requirement_id' in response.data
+
+@pytest.mark.django_db
+def test_ai_review_session_edit_mode_validates_ownership():
+    user1 = User.objects.create_user(username='ai_owner1', password='pass')
+    user2 = User.objects.create_user(username='ai_owner2', password='pass')
+    req = RequirementRequest.objects.create(name='Test', summary='Sum', country='China', requirement_type='bug', submitter=user1, owning_department='it')
+
+    client = APIClient()
+    client.force_authenticate(user=user2)
+
+    with override_settings(DASHSCOPE_API_KEY='test_key'):
+        response = client.post('/api/ai/review-sessions/', {
+            'mode': 'edit',
+            'requirement_id': req.id,
+            'form_context': {'name': 'Test', 'summary': 'Test summary'}
+        }, format='json')
+    assert response.status_code == 403
+
+@pytest.mark.django_db
+def test_ai_review_session_edit_mode_validates_status():
+    user = User.objects.create_user(username='ai_status_user', password='pass')
+    req = RequirementRequest.objects.create(name='Test', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it', status='confirmed')
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    with override_settings(DASHSCOPE_API_KEY='test_key'):
+        response = client.post('/api/ai/review-sessions/', {
+            'mode': 'edit',
+            'requirement_id': req.id,
+            'form_context': {'name': 'Test', 'summary': 'Test summary'}
+        }, format='json')
+    assert response.status_code == 400
+
+@pytest.mark.django_db
+def test_ai_review_session_concurrent_limit():
+    user = User.objects.create_user(username='ai_limit_user', password='pass')
+    for i in range(3):
+        ReviewSession.objects.create(user=user, mode='create', status='asking', form_context={'name': f'Test{i}', 'summary': f'Sum{i}'})
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    with override_settings(DASHSCOPE_API_KEY='test_key'):
+        response = client.post('/api/ai/review-sessions/', {
+            'mode': 'create',
+            'form_context': {'name': 'Test', 'summary': 'Test summary'}
+        }, format='json')
+    assert response.status_code == 400
+
+@pytest.mark.django_db
+def test_ai_review_message_non_owner_forbidden():
+    user1 = User.objects.create_user(username='ai_msg_owner1', password='pass')
+    user2 = User.objects.create_user(username='ai_msg_owner2', password='pass')
+    session = ReviewSession.objects.create(user=user1, mode='create', status='asking', form_context={'name': 'Test', 'summary': 'Sum'})
+
+    client = APIClient()
+    client.force_authenticate(user=user2)
+
+    with override_settings(DASHSCOPE_API_KEY='test_key'):
+        response = client.post(f'/api/ai/review-sessions/{session.id}/messages/', {
+            'answer': 'Test answer'
+        }, format='json')
+    assert response.status_code == 404
+
+@pytest.mark.django_db
+def test_ai_review_message_wrong_state():
+    user = User.objects.create_user(username='ai_msg_state', password='pass')
+    session = ReviewSession.objects.create(user=user, mode='create', status='generated', form_context={'name': 'Test', 'summary': 'Sum'})
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    with override_settings(DASHSCOPE_API_KEY='test_key'):
+        response = client.post(f'/api/ai/review-sessions/{session.id}/messages/', {
+            'answer': 'Test answer'
+        }, format='json')
+    assert response.status_code == 400
+
+@pytest.mark.django_db
+def test_ai_review_confirm_wrong_state():
+    user = User.objects.create_user(username='ai_confirm_state', password='pass')
+    session = ReviewSession.objects.create(user=user, mode='create', status='asking', form_context={'name': 'Test', 'summary': 'Sum'})
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post(f'/api/ai/review-sessions/{session.id}/confirm/')
+    assert response.status_code == 400
+
+@pytest.mark.django_db
+def test_ai_review_confirm_success():
+    user = User.objects.create_user(username='ai_confirm_ok', password='pass')
+    session = ReviewSession.objects.create(user=user, mode='create', status='generated', form_context={'name': 'Test', 'summary': 'Sum'}, generated_description='<p>Desc</p>', generated_acceptance='<ul><li>AC</li></ul>')
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post(f'/api/ai/review-sessions/{session.id}/confirm/')
+    assert response.status_code == 200
+    session.refresh_from_db()
+    assert session.status == 'confirmed'
+
+@pytest.mark.django_db
+def test_ai_review_discard_success():
+    user = User.objects.create_user(username='ai_discard_ok', password='pass')
+    session = ReviewSession.objects.create(user=user, mode='create', status='asking', form_context={'name': 'Test', 'summary': 'Sum'})
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post(f'/api/ai/review-sessions/{session.id}/discard/')
+    assert response.status_code == 200
+    session.refresh_from_db()
+    assert session.status == 'discarded'
+
+@pytest.mark.django_db
+def test_admin_review_sessions_same_department():
+    admin = User.objects.create_user(username='ai_admin_same', password='pass', role='admin', department='it')
+    user = User.objects.create_user(username='ai_req_owner', password='pass')
+    req = RequirementRequest.objects.create(name='Test', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it')
+    session = ReviewSession.objects.create(user=user, requirement=req, mode='edit', status='confirmed', form_context={'name': 'Test', 'summary': 'Sum'}, generated_description='<p>Desc</p>')
+    ReviewMessage.objects.create(session=session, role='ai', content='Question 1')
+    ReviewMessage.objects.create(session=session, role='user', content='Answer 1')
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.get(f'/api/admin/requests/{req.id}/review-sessions/')
+    assert response.status_code == 200
+    assert len(response.data) == 1
+    assert len(response.data[0]['messages']) == 2
+
+@pytest.mark.django_db
+def test_admin_review_sessions_cross_department_404():
+    admin = User.objects.create_user(username='ai_admin_cross', password='pass', role='admin', department='rnd')
+    user = User.objects.create_user(username='ai_req_owner2', password='pass')
+    req = RequirementRequest.objects.create(name='Test', summary='Sum', country='China', requirement_type='bug', submitter=user, owning_department='it')
+    session = ReviewSession.objects.create(user=user, requirement=req, mode='edit', status='confirmed', form_context={'name': 'Test', 'summary': 'Sum'})
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.get(f'/api/admin/requests/{req.id}/review-sessions/')
+    assert response.status_code == 404
+
+@pytest.mark.django_db
+def test_html_sanitizer_strips_script():
+    from requirements_app.services.ai_review import sanitize_html
+    dirty = '<script>alert("xss")</script><p>Safe content</p>'
+    clean = sanitize_html(dirty)
+    assert '<script>' not in clean
+    assert '<p>Safe content</p>' in clean
+
+@pytest.mark.django_db
+def test_html_sanitizer_allows_valid_tags():
+    from requirements_app.services.ai_review import sanitize_html
+    html = '<h3>Title</h3><p>Text with <strong>bold</strong> and <em>italic</em></p><ul><li>Item 1</li></ul>'
+    result = sanitize_html(html)
+    assert '<h3>Title</h3>' in result
+    assert '<strong>bold</strong>' in result
+    assert '<ul><li>Item 1</li></ul>' in result

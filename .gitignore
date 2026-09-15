@@ -33,6 +33,11 @@ yarn-error.log*
 frontend/dist/
 frontend/.env*
 
+# Environment variables (security: never commit API keys)
+.env
+.env.local
+.env.*.local
+
 # IDE & Editors
 .vscode/
 .idea/

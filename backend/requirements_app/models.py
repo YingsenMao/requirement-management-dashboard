@@ -104,3 +104,44 @@ class Attachment(models.Model):
 
     def __str__(self):
         return f"Attachment for {self.requirement.name} - {self.file.name}"
+
+
+class ReviewSession(models.Model):
+    MODE_CHOICES = [
+        ('create', 'Create'),
+        ('edit', 'Edit'),
+    ]
+    STATUS_CHOICES = [
+        ('asking', 'Asking'),
+        ('generated', 'Generated'),
+        ('confirmed', 'Confirmed'),
+        ('discarded', 'Discarded'),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='review_sessions')
+    requirement = models.ForeignKey(RequirementRequest, on_delete=models.CASCADE, related_name='review_sessions', null=True, blank=True)
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='asking')
+    form_context = models.JSONField(default=dict)
+    generated_description = models.TextField(null=True, blank=True)
+    generated_acceptance = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"ReviewSession {self.id} ({self.user.username}, {self.mode}, {self.status})"
+
+
+class ReviewMessage(models.Model):
+    ROLE_CHOICES = [
+        ('ai', 'AI'),
+        ('user', 'User'),
+    ]
+
+    session = models.ForeignKey(ReviewSession, on_delete=models.CASCADE, related_name='messages')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Message {self.id} ({self.role}) for session {self.session.id}"

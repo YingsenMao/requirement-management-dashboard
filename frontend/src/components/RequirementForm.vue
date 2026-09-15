@@ -53,6 +53,16 @@
           <EditorContent v-if="!disabled" :editor="editor" class="rich-editor-content" />
           <div v-else class="rich-editor-preview" v-html="modelValue.summary || '<span class=\'text-muted\'>No description</span>'"></div>
         </div>
+        <el-button
+          v-if="modelValue.owning_department === 'it' && !disabled"
+          type="primary"
+          plain
+          size="small"
+          @click="$emit('ai-review')"
+          style="margin-top: 8px"
+        >
+          AI Review
+        </el-button>
       </el-form-item>
       <el-row :gutter="16">
         <el-col :span="12">
@@ -278,6 +288,7 @@ const emit = defineEmits<{
   'uploadExceed': []
   'uploadPreview': [file: UploadUserFile]
   'download': [id: number, fileName: string]
+  'ai-review': []
 }>()
 
 const rules: FormRules = {

@@ -214,3 +214,39 @@ class UserCreateSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+
+class ReviewSessionSerializer(serializers.ModelSerializer):
+    messages = serializers.SerializerMethodField()
+
+    class Meta:
+        model = __import__('requirements_app.models', fromlist=['ReviewSession']).ReviewSession
+        fields = ['id', 'mode', 'status', 'form_context', 'generated_description', 'generated_acceptance', 'created_at', 'updated_at', 'messages']
+        read_only_fields = fields
+
+    def get_messages(self, obj):
+        from .models import ReviewMessage
+        messages = ReviewMessage.objects.filter(session=obj).order_by('created_at')
+        return [{'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()} for m in messages]
+
+
+class ReviewSessionCreateSerializer(serializers.Serializer):
+    mode = serializers.ChoiceField(choices=['create', 'edit'])
+    requirement_id = serializers.IntegerField(required=False, allow_null=True)
+    form_context = serializers.JSONField()
+
+    def validate_form_context(self, value):
+        if not value.get('name') or not value.get('summary'):
+            raise serializers.ValidationError("form_context must include 'name' and 'summary'")
+        return value
+
+    def validate(self, data):
+        mode = data.get('mode')
+        requirement_id = data.get('requirement_id')
+        if mode == 'edit' and not requirement_id:
+            raise serializers.ValidationError({"requirement_id": "requirement_id is required for edit mode"})
+        return data
+
+
+class ReviewMessageSerializer(serializers.Serializer):
+    answer = serializers.CharField()

@@ -132,3 +132,26 @@ CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:18080').split(',')
+    if origin.strip()
+]
+
+# AI Review Configuration
+DASHSCOPE_API_KEY = os.environ.get('DASHSCOPE_API_KEY', '')
+AI_REVIEW_MODEL = os.environ.get('AI_REVIEW_MODEL', 'qwen-plus')
+AI_REVIEW_BASE_URL = os.environ.get('AI_REVIEW_BASE_URL', 'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1')
+AI_REVIEW_PRD_PATH = os.environ.get('AI_REVIEW_PRD_PATH', str(BASE_DIR / 'requirements_app' / 'prompts' / 'it_review_prd.md'))
+
+# DRF Throttling for AI Review
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '1000/hour',
+        'ai_review': '30/hour',
+    },
+}

@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SaaS Requirements Management Platform - User Training</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #1f2937;
+            overflow: hidden;
+        }
+
+        .presentation {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        .slide {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none;
+            background: white;
+            padding: 60px 80px;
+            overflow-y: auto;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Cover Slide */
+        .cover-slide {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white;
+        }
+
+        .cover-slide h1 {
+            font-size: 56px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .cover-slide .subtitle {
+            font-size: 28px;
+            font-weight: 300;
+            opacity: 0.95;
+        }
+
+        /* Content Slides */
+        .content-slide h2 {
+            font-size: 42px;
+            font-weight: 700;
+            color: #2563eb;
+            margin-bottom: 40px;
+            border-bottom: 4px solid #2563eb;
+            padding-bottom: 15px;
+        }
+
+        .content-slide h3 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1e40af;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .content-slide p {
+            font-size: 22px;
+            line-height: 1.6;
+            color: #374151;
+            margin-bottom: 15px;
+        }
+
+        .content-slide ul {
+            font-size: 22px;
+            line-height: 1.8;
+            margin-left: 40px;
+            color: #374151;
+        }
+
+        .content-slide li {
+            margin-bottom: 12px;
+        }
+
+        .content-slide ol {
+            font-size: 22px;
+            line-height: 1.8;
+            margin-left: 40px;
+            color: #374151;
+        }
+
+        .content-slide ol li {
+            margin-bottom: 12px;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .feature-item {
+            background: #f3f4f6;
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid #2563eb;
+        }
+
+        .feature-item h4 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+
+        .feature-item p {
+            font-size: 18px;
+            color: #6b7280;
+            margin: 0;
+        }
+
+        /* Workflow Steps */
+        .workflow-steps {
+            counter-reset: step-counter;
+            list-style: none;
+            margin-left: 0;
+        }
+
+        .workflow-steps li {
+            counter-increment: step-counter;
+            position: relative;
+            padding-left: 60px;
+            margin-bottom: 20px;
+        }
+
+        .workflow-steps li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 40px;
+            height: 40px;
+            background: #2563eb;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 20px;
+        }
+
+        /* Priority Table */
+        .priority-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 20px;
+        }
+
+        .priority-table th {
+            background: #2563eb;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .priority-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .priority-table tr:nth-child(even) {
+            background: #f9fafb;
+        }
+
+        .priority-table .score {
+            font-weight: 700;
+            color: #2563eb;
+            text-align: right;
+        }
+
+        /* Thank You Slide */
+        .thank-you-slide {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+            color: white;
+        }
+
+        .thank-you-slide h2 {
+            font-size: 64px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            border: none;
+            color: white;
+        }
+
+        .thank-you-slide p {
+            font-size: 24px;
+            opacity: 0.95;
+            margin-bottom: 15px;
+        }
+
+        /* Navigation */
+        .nav-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .nav-btn {
+            background: rgba(37, 99, 235, 0.9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-btn:hover {
+            background: rgba(30, 64, 175, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-btn:disabled {
+            background: rgba(156, 163, 175, 0.5);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-indicator {
+            background: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #2563eb;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+            }
+
+            .slide {
+                position: relative;
+                page-break-after: always;
+                height: auto;
+                min-height: 100vh;
+            }
+
+            .nav-controls {
+                display: none;
+            }
+
+            .slide.active {
+                display: flex;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .slide {
+                padding: 40px 50px;
+            }
+
+            .cover-slide h1 {
+                font-size: 42px;
+            }
+
+            .content-slide h2 {
+                font-size: 36px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation">
+        <!-- Slide 1: Cover -->
+        <div class="slide cover-slide active">
+            <h1>SaaS Requirements<br>Management Platform</h1>
+            <p class="subtitle">User Training Guide</p>
+        </div>
+
+        <!-- Slide 2: Why This Platform? -->
+        <div class="slide content-slide">
+            <h2>Why This Platform?</h2>
+            
+            <h3>The Problem</h3>
+            <p>Managing requirements from global users manually is chaotic, time-consuming, and lacks objective prioritization.</p>
+            
+            <h3>The Solution</h3>
+            <p>A centralized platform that enables Product Managers to collect, manage, and prioritize feature requests with automated scoring.</p>
+            
+            <h3>Key Benefits</h3>
+            <ul>
+                <li><strong>Transparency:</strong> All users can see requirements and their status</li>
+                <li><strong>Efficiency:</strong> Automated workflows reduce manual overhead</li>
+                <li><strong>Objectivity:</strong> Priority scoring based on ROI and risk factors</li>
+                <li><strong>Security:</strong> Department-scoped access control</li>
+            </ul>
+        </div>
+
+        <!-- Slide 3: What Can It Do? -->
+        <div class="slide content-slide">
+            <h2>What Can It Do?</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h4>🔐 Role-Based Access</h4>
+                    <p>Admin vs Regular User roles with distinct permissions</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h4>🏢 Department Scoping</h4>
+                    <p>IT and R&D departments with isolated data access</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h4>🔄 State Machine</h4>
+                    <p>Request lifecycle with automatic locking after assessment</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h4>📊 Auto Priority Scoring</h4>
+                    <p>Weighted algorithm calculates priority based on multiple factors</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h4>🤖 AI-Powered Review</h4>
+                    <p>AI assists IT requirements with up to 5 follow-up questions</p>
+                </div>
+                
+                <div class="feature-item">
+                    <h4>📎 Secure Attachments</h4>
+                    <p>Upload up to 3 files with size and type validation</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: Regular User Workflow -->
+        <div class="slide content-slide">
+            <h2>Regular User Workflow</h2>
+            
+            <ol class="workflow-steps">
+                <li><strong>Login</strong> → Access the platform with your credentials</li>
+                <li><strong>Create Requirement</strong> → Select department (IT or R&D) first, then fill in details</li>
+                <li><strong>Add Attachments</strong> → Upload up to 3 supporting documents (PDF, DOCX, XLSX, PNG, JPG, max 5MB each)</li>
+                <li><strong>AI Review (IT Only)</strong> → Optional: Let AI ask up to 5 questions to refine your requirement</li>
+                <li><strong>Submit & Track</strong> → View your requirement in the global list, sorted by priority score</li>
+                <li><strong>Edit (If Needed)</strong> → Edit your own requests only when status is "Pending Review" or "Rejected"</li>
+                <li><strong>Lock After Assessment</strong> → Once admin assesses, the request becomes read-only</li>
+            </ol>
+            
+            <p style="margin-top: 30px; padding: 20px; background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 4px;">
+                <strong>Note:</strong> You can view all requirements but can only edit your own. Other users' requirements are read-only.
+            </p>
+        </div>
+
+        <!-- Slide 5: Admin Workflow -->
+        <div class="slide content-slide">
+            <h2>Admin Workflow</h2>
+            
+            <ol class="workflow-steps">
+                <li><strong>Login</strong> → Access with department-assigned credentials (IT or R&D)</li>
+                <li><strong>View Requirements</strong> → See only requirements from your department (department-scoped list)</li>
+                <li><strong>Assess Requirement</strong> → Click "Assess" to set:
+                    <ul style="margin-top: 10px; font-size: 18px;">
+                        <li>Workload (Small / Medium / Large)</li>
+                        <li>Status (Pending Review → Under Review → Confirmed → In Development → Completed, or Rejected)</li>
+                        <li>Estimated Completion Date (optional)</li>
+                    </ul>
+                </li>
+                <li><strong>Auto Priority Score</strong> → System automatically calculates priority score based on your workload input</li>
+                <li><strong>View AI History (IT)</strong> → For IT requirements, view the full AI review conversation if applicable</li>
+                <li><strong>Manage Users</strong> → Create new user accounts (Regular User or Admin with department)</li>
+            </ol>
+            
+            <p style="margin-top: 30px; padding: 20px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+                <strong>Important:</strong> You cannot edit the user's original content or change the owning department. You can only set workload, status, and estimated completion date.
+            </p>
+        </div>
+
+        <!-- Slide 6: Priority Scoring Formula -->
+        <div class="slide content-slide">
+            <h2>Priority Scoring Formula</h2>
+            
+            <p style="margin-bottom: 20px;">The system calculates a priority score by summing weighted factors. <strong>Score is only calculated after admin sets the Workload.</strong></p>
+            
+            <table class="priority-table">
+                <thead>
+                    <tr>
+                        <th>Factor</th>
+                        <th>Criteria</th>
+                        <th class="score">Points</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td rowspan="6"><strong>Requirement Type</strong></td>
+                        <td>Regulatory Compliance</td>
+                        <td class="score">+50</td>
+                    </tr>
+                    <tr>
+                        <td>Security Vulnerability</td>
+                        <td class="score">+40</td>
+                    </tr>
+                    <tr>
+                        <td>Bug</td>
+                        <td class="score">+30</td>
+                    </tr>
+                    <tr>
+                        <td>Revenue Growth</td>
+                        <td class="score">+20</td>
+                    </tr>
+                    <tr>
+                        <td>Cost Reduction</td>
+                        <td class="score">+10</td>
+                    </tr>
+                    <tr>
+                        <td>Feature Optimization</td>
+                        <td class="score">+0</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="4"><strong>Impacted Users</strong></td>
+                        <td>> 1,000</td>
+                        <td class="score">+40</td>
+                    </tr>
+                    <tr>
+                        <td>500 - 1,000</td>
+                        <td class="score">+30</td>
+                    </tr>
+                    <tr>
+                        <td>100 - 500</td>
+                        <td class="score">+20</td>
+                    </tr>
+                    <tr>
+                        <td>< 100</td>
+                        <td class="score">+10</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="4"><strong>Revenue Impact</strong></td>
+                        <td>> $1M</td>
+                        <td class="score">+50</td>
+                    </tr>
+                    <tr>
+                        <td>$300k - $1M</td>
+                        <td class="score">+30</td>
+                    </tr>
+                    <tr>
+                        <td>$50k - $300k</td>
+                        <td class="score">+20</td>
+                    </tr>
+                    <tr>
+                        <td>< $50k</td>
+                        <td class="score">+10</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Supplementary Materials</strong></td>
+                        <td>+20 per item selected</td>
+                        <td class="score">Max +50</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="3"><strong>Workload</strong></td>
+                        <td>Small</td>
+                        <td class="score">+50</td>
+                    </tr>
+                    <tr>
+                        <td>Medium</td>
+                        <td class="score">+10</td>
+                    </tr>
+                    <tr>
+                        <td>Large</td>
+                        <td class="score">-10</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Slide 7: Thank You -->
+        <div class="slide thank-you-slide">
+            <h2>Thank You!</h2>
+            <p>You're now ready to use the SaaS Requirements Management Platform</p>
+            <p style="margin-top: 40px; font-size: 20px;">For support or questions, please contact your system administrator</p>
+        </div>
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="nav-controls">
+        <button class="nav-btn" id="prevBtn" onclick="previousSlide()">← Previous</button>
+        <div class="progress-indicator">
+            <span id="currentSlide">1</span> / <span id="totalSlides">7</span>
+        </div>
+        <button class="nav-btn" id="nextBtn" onclick="nextSlide()">Next →</button>
+    </div>
+
+    <script>
+        let currentSlideIndex = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        document.getElementById('totalSlides').textContent = totalSlides;
+
+        function showSlide(index) {
+            slides.forEach((slide, i) => {
+                slide.classList.remove('active');
+                if (i === index) {
+                    slide.classList.add('active');
+                }
+            });
+
+            currentSlideIndex = index;
+            document.getElementById('currentSlide').textContent = index + 1;
+
+            // Update button states
+            document.getElementById('prevBtn').disabled = index === 0;
+            document.getElementById('nextBtn').disabled = index === totalSlides - 1;
+        }
+
+        function nextSlide() {
+            if (currentSlideIndex < totalSlides - 1) {
+                showSlide(currentSlideIndex + 1);
+            }
+        }
+
+        function previousSlide() {
+            if (currentSlideIndex > 0) {
+                showSlide(currentSlideIndex - 1);
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                previousSlide();
+            }
+        });
+
+        // Initialize
+        showSlide(0);
+    </script>
+</body>
+</html>

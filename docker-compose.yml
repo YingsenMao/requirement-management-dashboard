@@ -35,6 +35,9 @@ services:
       - DB_HOST=db
       - DB_PORT=3306
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+      - AI_REVIEW_MODEL=${AI_REVIEW_MODEL:-qwen3.6-flash}
+      - AI_REVIEW_BASE_URL=${AI_REVIEW_BASE_URL:-https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles

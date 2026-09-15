@@ -13,6 +13,8 @@
 - 2026-07-18: Changed Region field to Country - replaced fixed region choices with a searchable global country list (195 countries); existing data migrated to "China". (AI)
 - 2026-07-18: Added Urgency field (High/Medium/Low) to requirement form - for reference only, not included in priority score calculation; Admin can view it during assessment. (AI)
 - 2026-09-13: Added Department dimension - Requirement requests now carry a mandatory "Owning Department" (IT / R&D) selected first at creation time (owner can still change it while Pending Review / Rejected). Admin accounts carry a department (IT / R&D) and can only view/assess/download attachments of requirements matching their own department (cross-department access returns 404/403). Regular users remain department-agnostic and can view all requirements, with a new "Department" column and IT/R&D filter on the user list. Added a User Management dialog (create-account only) in the Admin Dashboard: admins can create Regular User accounts (no department) or Admin accounts (department required); any admin may create admins of either department. Existing admins and existing requirements were migrated to department "IT". (AI)
+- 2026-09-13: Added AI Requirement Review for IT department - When creating or editing an IT requirement, users can optionally launch an AI-powered review flow (skippable). The AI acts as a senior product manager, asks up to 5 follow-up questions one at a time based on the user's previous answers, then generates a refined requirement description and acceptance criteria. The user can edit or confirm the result, which is then merged into the Description (summary) field. All review sessions are persisted in the database for auditability; admins can view the full conversation history in the Assess dialog. R&D requirements use the traditional form without AI review. The AI is powered by Alibaba Cloud DashScope Qwen, with the review context based on a platform-provided PRD document (PRD_BCW.md). (AI)
+- 2026-09-15: Added Django admin AI Review Audit page - Superusers can access `/admin/` to view aggregate audit statistics (total sessions, total messages, status breakdown, confirmation rate, avg messages/session, unique users) and a per-user usage table (username, role, sessions, messages, confirmed, last activity). Individual sessions can be drilled into to view the full AI/user conversation via read-only inline messages. All review data is read-only (no add/change/delete) for pure audit purposes. (AI)
 
 ## Project overview
 This project is a SaaS Requirements Management Platform designed for Product Managers to collect, manage, and prioritize feature requests from global users. The system allows administrators to create user accounts, while regular users can submit and track their requirement requests. The core value of the platform is its automated priority scoring system, which helps PMs objectively rank requests based on ROI and risk factors.
@@ -65,21 +67,39 @@ This project is a SaaS Requirements Management Platform designed for Product Man
   - **Supplementary Materials:** +20 for each selected item (Max +50).
   - **Workload:** Small (+50), Medium (+10), Large (-10).
 
+### 5. AI Requirement Review (IT Department Only)
+- **Trigger:** When creating or editing a requirement with Owning Department = IT, users see an "AI Review" button below the Description field. R&D requirements do not show this button and use the traditional form.
+- **Optional & Skippable:** Users can skip the AI review and submit directly with their manually written description. AI service unavailability does not block submission.
+- **Review Flow:**
+  1. User clicks "AI Review" → system creates a ReviewSession with form context snapshot (name, summary, requirement_type, etc.)
+  2. AI (acting as senior product manager) asks the first follow-up question based on the provided PRD context (PRD_BCW.md)
+  3. User answers → AI asks next question (up to 5 questions total, can converge earlier if information is sufficient)
+  4. After ≤5 questions, AI generates: (a) refined requirement description, (b) acceptance criteria
+  5. User previews the result → can edit in the form or confirm → merged into Description (summary) field as HTML
+- **Session Persistence:** All review sessions and messages are stored in the database (ReviewSession/ReviewMessage tables) for auditability. Each user can have at most 3 active (asking/generated) sessions to prevent abuse.
+- **Admin Retrospection:** In the Admin Assess dialog, if the requirement has review sessions, a collapsible "AI Review History" panel shows the full conversation (Q&A) and final generated result.
+- **Django Admin Audit Page:** Superusers can access `/admin/` → Review Sessions to view aggregate audit statistics (total sessions, total messages, status breakdown, confirmation rate, avg messages/session, unique users) and a per-user usage table (username, role, sessions, messages, confirmed, last activity). Individual sessions can be drilled into to view the full AI/user conversation via read-only inline messages. All review data is read-only (no add/change/delete) for pure audit purposes.
+- **LLM Provider:** Alibaba Cloud DashScope Qwen (OpenAI-compatible API), configured via DASHSCOPE_API_KEY environment variable. Model defaults to qwen-plus, configurable via AI_REVIEW_MODEL.
+- **Rate Limiting:** 30 requests per hour per user to prevent API abuse.
+
 ## Core components
 - **Frontend:** Vue 3 + Element Plus + TypeScript (Vite build).
 - **Backend:** Python + Django + Django REST Framework (DRF).
 - **Database:** MySQL 8.0 (via Docker Compose).
 - **Authentication:** JWT (JSON Web Tokens) via SimpleJWT.
 - **Storage:** Local Docker Volumes (mapped to Alibaba Cloud ECS disk), served directly via Nginx.
+- **LLM:** Alibaba Cloud DashScope Qwen (OpenAI-compatible API) for AI requirement review.
 
 ## App/user flow
 1. Admin logs in, opens the "User Management" dialog, and creates a Regular User account (or an Admin account with a department).
 2. Regular User logs in and submits a new requirement request, first selecting the Owning Department (IT or R&D), then filling in the details and optionally uploading up to 3 supporting documents (e.g., PDF, DOCX).
-3. The request appears in the global list as "Pending Review" with Workload "Pending". The Submitter's username, Country, and Department are visible.
-4. An admin whose department matches the request's Owning Department logs in, sees the new request in their department-scoped list (Priority Score is "N/A" at the bottom), and downloads the attachments for review. Admins of the other department cannot see or access it.
-5. Admin clicks "Assess" on the request and updates the Workload to "Medium" and Status to "Confirmed". (Admin cannot edit the user's original text or the Owning Department).
-6. System automatically calculates the Priority Score based on the formula and updates the list sorting.
-7. Regular User views their dashboard; the request is now "Confirmed" and all edit buttons (including file upload/remove and department change) are disabled (locked).
+3. **For IT requirements:** User can optionally click "AI Review" to launch an AI-powered review flow. The AI asks up to 5 follow-up questions, then generates a refined description and acceptance criteria. User confirms or edits, which is merged into the Description field. User can skip this step and submit directly.
+4. **For R&D requirements:** User fills in the Description manually and submits directly (no AI review).
+5. The request appears in the global list as "Pending Review" with Workload "Pending". The Submitter's username, Country, and Department are visible.
+6. An admin whose department matches the request's Owning Department logs in, sees the new request in their department-scoped list (Priority Score is "N/A" at the bottom), and downloads the attachments for review. Admins of the other department cannot see or access it.
+7. Admin clicks "Assess" on the request and updates the Workload to "Medium" and Status to "Confirmed". (Admin cannot edit the user's original text or the Owning Department). If the requirement has AI review sessions, the admin can view the full conversation history in the Assess dialog.
+8. System automatically calculates the Priority Score based on the formula and updates the list sorting.
+9. Regular User views their dashboard; the request is now "Confirmed" and all edit buttons (including file upload/remove and department change) are disabled (locked).
 
 ## Implementation plan
 - **Task 1:** Initialize project repositories (Django backend, Vue 3 frontend).
@@ -92,3 +112,5 @@ This project is a SaaS Requirements Management Platform designed for Product Man
 - **Task 8:** End-to-end testing and bug fixing.
 - **Task 9:** Iteration - Visibility, Submitter Column, and Permission Refinement.
 - **Task 10:** Iteration - Department Dimension: Owning Department on requirements, Admin department scoping/isolation, User Management dialog (create-account), and department column/filter on the user list.
+- **Task 11:** AI Requirement Review (IT Only): ReviewSession/ReviewMessage data model, AI service layer (DashScope Qwen), API endpoints for session lifecycle + admin retrospection, frontend AiReviewDialog component, integration into RequirementForm/UserDashboard/AdminDashboard, deployment configuration (DASHSCOPE_API_KEY env var).
+- **Task 12:** AI Review Audit Page (Django Admin): Register ReviewSession/ReviewMessage in Django admin with read-only audit page, aggregate statistics panel (total sessions/messages, status breakdown, confirmation rate, avg messages/session, unique users), per-user usage table, and inline message viewing for individual session drill-down.
