@@ -417,6 +417,13 @@ const handleEditPreview = (file: UploadUserFile) => {
 }
 
 const openAiReview = (mode: 'create' | 'edit') => {
+  const form = mode === 'create' ? createForm.value : editForm.value
+  
+  if (!form.name?.trim() || !form.summary?.trim()) {
+    ElMessage.warning('Please fill in both Name and Description before starting AI Review')
+    return
+  }
+  
   aiReviewMode.value = mode
   if (mode === 'create') {
     aiReviewFormContext.value = {
