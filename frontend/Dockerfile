@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS build-stage
+FROM registry.cn-hangzhou.aliyuncs.com/library/node:18-alpine AS build-stage
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine AS production-stage
+FROM registry.cn-hangzhou.aliyuncs.com/library/nginx:alpine AS production-stage
 
 # Copy built files from build stage
 COPY --from=build-stage /app/dist /usr/share/nginx/html
