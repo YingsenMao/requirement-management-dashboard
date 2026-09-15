@@ -1,5 +1,5 @@
 # Build stage
-FROM registry.cn-hangzhou.aliyuncs.com/library/node:18-alpine AS build-stage
+FROM node:18-alpine AS build-stage
 
 WORKDIR /app
 
@@ -9,8 +9,8 @@ COPY package*.json ./
 # Remove stale lockfile to force resolution of updated vue-tsc & typescript versions
 RUN rm -f package-lock.json
 
-# Install dependencies
-RUN npm install
+# Install dependencies (use China npm mirror for stable access from Aliyun ECS)
+RUN npm config set registry https://registry.npmmirror.com && npm install
 
 # Copy project files
 COPY . .
@@ -19,7 +19,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM registry.cn-hangzhou.aliyuncs.com/library/nginx:alpine AS production-stage
+FROM nginx:alpine AS production-stage
 
 # Copy built files from build stage
 COPY --from=build-stage /app/dist /usr/share/nginx/html
