@@ -75,6 +75,7 @@ class UserListView(APIView):
     """
     Returns a list of all regular users (for the Submitter filter).
     """
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -87,6 +88,7 @@ class UserCreateView(APIView):
     Admin-only endpoint to create accounts (create-account only).
     Regular User accounts have no department; Admin accounts require one.
     """
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAdminUser]
 
     def post(self, request):
@@ -290,6 +292,7 @@ class AttachmentDownloadView(APIView):
     Secure endpoint to download attachments.
     Ensures only the submitter or an admin can download the file.
     """
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
